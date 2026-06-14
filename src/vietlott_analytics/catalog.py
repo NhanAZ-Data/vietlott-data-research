@@ -23,6 +23,8 @@ class AnalyticsProduct:
     special_max: int | None = None
     special_count: int = 0
     sequence_length: int | None = None
+    sequence_min: int = 0
+    sequence_max: int = 9
     expected_outcomes_per_draw: int = 1
     note: str = ""
 
@@ -91,8 +93,10 @@ PRODUCTS: dict[str, AnalyticsProduct] = {
         kind=AnalysisKind.DIGIT_SEQUENCE,
         active=True,
         sequence_length=3,
+        sequence_min=1,
+        sequence_max=6,
         expected_outcomes_per_draw=1,
-        note="Ba chữ số có thứ tự, mỗi vị trí nhận giá trị từ 0 đến 9.",
+        note="Ba giá trị có thứ tự, mỗi vị trí nhận giá trị từ 1 đến 6.",
     ),
     "max3d": AnalyticsProduct(
         slug="max3d",

@@ -14,7 +14,15 @@ from typing import Any
 from .catalog import AnalysisKind, AnalyticsProduct
 from .io import Observation, ProductDataset
 
-MODEL_VERSION = "1.0.0"
+MODEL_VERSION = "1.1.0"
+NUMBER_SCORE_POLICY = (
+    "recent=0.6*short+0.4*recent; "
+    "balanced=0.4*short+0.3*recent-0.15*long+0.15*overdue"
+)
+DIGIT_SCORE_POLICY = (
+    "recent=0.6*short+0.4*recent; "
+    "balanced=0.4*short+0.3*recent-0.2*long"
+)
 NORMAL = NormalDist()
 
 
@@ -299,9 +307,13 @@ def _number_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
     product = dataset.product
     observations = dataset.observations
     total_counts = Counter(value for item in observations for value in item.values)
-    recent_window = min(1000 if product.slug == "keno" else 200, len(observations))
+    recent_window = min(500 if product.slug == "keno" else 200, len(observations))
+    short_window = min(50, len(observations))
     recent_counts = Counter(
         value for item in observations[-recent_window:] for value in item.values
+    )
+    short_counts = Counter(
+        value for item in observations[-short_window:] for value in item.values
     )
     last_seen: dict[int, int] = {}
     for index, item in enumerate(observations):
@@ -313,6 +325,8 @@ def _number_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
         len(observations),
         recent_counts,
         recent_window,
+        short_counts,
+        short_window,
         last_seen,
         len(observations),
     )
@@ -339,8 +353,10 @@ def _number_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
                 "parameters": {
                     "history_draws": len(observations),
                     "recent_window_draws": recent_window,
+                    "short_window_draws": short_window,
                     "selection_count": product.pick_count,
                     "pool_size": product.pool_size,
+                    "score_policy": NUMBER_SCORE_POLICY,
                     "seed_policy": "sha256(product, cutoff, model_version)",
                 },
             }
@@ -351,23 +367,31 @@ def _number_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
 def _digit_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
     product = dataset.product
     length = product.sequence_length or 0
+    symbols = list(range(product.sequence_min, product.sequence_max + 1))
     total = [Counter() for _ in range(length)]
     recent = [Counter() for _ in range(length)]
+    short = [Counter() for _ in range(length)]
     outcomes = [outcome for item in dataset.observations for outcome in item.outcomes]
     recent_draws = dataset.observations[-min(500, len(dataset.observations)) :]
+    short_draws = dataset.observations[-min(50, len(dataset.observations)) :]
     recent_outcomes = [outcome for item in recent_draws for outcome in item.outcomes]
+    short_outcomes = [outcome for item in short_draws for outcome in item.outcomes]
+
     for outcome in outcomes:
         for position, char in enumerate(outcome):
             total[position][int(char)] += 1
     for outcome in recent_outcomes:
         for position, char in enumerate(outcome):
             recent[position][int(char)] += 1
+    for outcome in short_outcomes:
+        for position, char in enumerate(outcome):
+            short[position][int(char)] += 1
 
     seed = f"{product.slug}|{dataset.latest.draw_id}|{MODEL_VERSION}"
     uniform_rng = random.Random(_seed_int(seed + "|uniform"))
-    uniform = "".join(str(uniform_rng.randrange(10)) for _ in range(length))
-    recent_mode = _digit_sequence_from_scores(total, recent, "recent", seed)
-    balanced = _digit_sequence_from_scores(total, recent, "balanced", seed)
+    uniform = "".join(str(uniform_rng.choice(symbols)) for _ in range(length))
+    recent_mode = _digit_sequence_from_scores(total, recent, short, symbols, "recent", seed)
+    balanced = _digit_sequence_from_scores(total, recent, short, symbols, "balanced", seed)
     return [
         {
             "strategy": "uniform_seeded",
@@ -376,7 +400,11 @@ def _digit_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
             "parameters": {
                 "history_draws": len(dataset.observations),
                 "recent_window_draws": len(recent_draws),
+                "short_window_draws": len(short_draws),
                 "sequence_length": length,
+                "symbol_min": product.sequence_min,
+                "symbol_max": product.sequence_max,
+                "score_policy": DIGIT_SCORE_POLICY,
             },
         },
         {
@@ -386,7 +414,11 @@ def _digit_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
             "parameters": {
                 "history_draws": len(dataset.observations),
                 "recent_window_draws": len(recent_draws),
+                "short_window_draws": len(short_draws),
                 "sequence_length": length,
+                "symbol_min": product.sequence_min,
+                "symbol_max": product.sequence_max,
+                "score_policy": DIGIT_SCORE_POLICY,
             },
         },
         {
@@ -396,7 +428,11 @@ def _digit_forecasts(dataset: ProductDataset) -> list[dict[str, Any]]:
             "parameters": {
                 "history_draws": len(dataset.observations),
                 "recent_window_draws": len(recent_draws),
+                "short_window_draws": len(short_draws),
                 "sequence_length": length,
+                "symbol_min": product.sequence_min,
+                "symbol_max": product.sequence_max,
+                "score_policy": DIGIT_SCORE_POLICY,
             },
         },
     ]
@@ -411,7 +447,8 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
     if start >= len(observations):
         return {"status": "insufficient_data", "samples": 0}
 
-    recent_window = 1000 if product.slug == "keno" else 200
+    recent_window = 500 if product.slug == "keno" else 200
+    short_window = 50
     total_counts: Counter[int] = Counter()
     last_seen: dict[int, int] = {}
     for index, item in enumerate(observations[:start]):
@@ -420,6 +457,8 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             last_seen[value] = index
     recent_items = deque(observations[max(0, start - recent_window) : start])
     recent_counts = Counter(value for item in recent_items for value in item.values)
+    short_items = deque(observations[max(0, start - short_window) : start])
+    short_counts = Counter(value for item in short_items for value in item.values)
 
     model_hits: list[int] = []
     baseline_hits: list[int] = []
@@ -434,6 +473,8 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             index,
             recent_counts,
             len(recent_items),
+            short_counts,
+            len(short_items),
             last_seen,
             index,
         )
@@ -457,6 +498,11 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
         if len(recent_items) > recent_window:
             expired = recent_items.popleft()
             recent_counts.subtract(expired.values)
+        short_items.append(target)
+        short_counts.update(target.values)
+        if len(short_items) > short_window:
+            expired_short = short_items.popleft()
+            short_counts.subtract(expired_short.values)
 
     z_score, p_value = _paired_normal_test(differences)
     expected_hits = (product.pick_count or 0) ** 2 / product.pool_size
@@ -468,6 +514,8 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
         "latest_test_draw_id": observations[-1].draw_id,
         "minimum_history_draws": start,
         "recent_window_draws": recent_window,
+        "short_window_draws": short_window,
+        "score_policy": NUMBER_SCORE_POLICY,
         "model": {
             "strategy": "balanced_signal",
             "average_hits": _round(fmean(model_hits)),
@@ -504,14 +552,20 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
         return {"status": "insufficient_data", "samples": 0}
 
     length = product.sequence_length or 0
+    symbols = list(range(product.sequence_min, product.sequence_max + 1))
     total = [Counter() for _ in range(length)]
     recent = [Counter() for _ in range(length)]
+    short = [Counter() for _ in range(length)]
     for item in observations[:start]:
         _update_digit_counts(total, item.outcomes, 1)
     recent_window = 500
+    short_window = 50
     recent_items = deque(observations[max(0, start - recent_window) : start])
+    short_items = deque(observations[max(0, start - short_window) : start])
     for item in recent_items:
         _update_digit_counts(recent, item.outcomes, 1)
+    for item in short_items:
+        _update_digit_counts(short, item.outcomes, 1)
 
     model_exact = 0
     baseline_exact = 0
@@ -520,9 +574,9 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
     for index in range(start, len(observations)):
         target = observations[index]
         seed = f"backtest|{product.slug}|{target.draw_id}|{MODEL_VERSION}"
-        model = _digit_sequence_from_scores(total, recent, "balanced", seed)
+        model = _digit_sequence_from_scores(total, recent, short, symbols, "balanced", seed)
         rng = random.Random(_seed_int(seed + "|uniform"))
-        baseline = "".join(str(rng.randrange(10)) for _ in range(length))
+        baseline = "".join(str(rng.choice(symbols)) for _ in range(length))
         actual = set(target.outcomes)
         model_exact += model in actual
         baseline_exact += baseline in actual
@@ -536,6 +590,12 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             expired = recent_items.popleft()
             _update_digit_counts(recent, expired.outcomes, -1)
 
+        short_items.append(target)
+        _update_digit_counts(short, target.outcomes, 1)
+        if len(short_items) > short_window:
+            expired_short = short_items.popleft()
+            _update_digit_counts(short, expired_short.outcomes, -1)
+
     samples = len(model_best)
     differences = [
         float(model - baseline)
@@ -543,7 +603,7 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
     ]
     z_score, p_value = _paired_normal_test(differences)
     average_outcomes = fmean(len(item.outcomes) for item in observations[start:])
-    expected_exact_rate = min(1.0, average_outcomes / (10**length))
+    expected_exact_rate = min(1.0, average_outcomes / (len(symbols) ** length))
     return {
         "status": "complete",
         "method": "walk_forward",
@@ -552,6 +612,10 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
         "latest_test_draw_id": observations[-1].draw_id,
         "minimum_history_draws": start,
         "recent_window_draws": recent_window,
+        "short_window_draws": short_window,
+        "symbol_min": product.sequence_min,
+        "symbol_max": product.sequence_max,
+        "score_policy": DIGIT_SCORE_POLICY,
         "model": {
             "strategy": "balanced_signal",
             "exact_hits": model_exact,
@@ -584,12 +648,15 @@ def _number_scores(
     total_draws: int,
     recent_counts: Counter[int],
     recent_draws: int,
+    short_counts: Counter[int],
+    short_draws: int,
     last_seen: dict[int, int],
     current_index: int,
 ) -> dict[int, dict[str, float]]:
     probability = (product.pick_count or 0) / product.pool_size
     total_sd = math.sqrt(max(total_draws * probability * (1 - probability), 1e-12))
     recent_sd = math.sqrt(max(recent_draws * probability * (1 - probability), 1e-12))
+    short_sd = math.sqrt(max(short_draws * probability * (1 - probability), 1e-12))
     scores = {}
     for value in range(product.pool_min or 1, (product.pool_max or 0) + 1):
         long_z = (
@@ -602,11 +669,16 @@ def _number_scores(
             if recent_draws
             else 0.0
         )
+        short_z = (
+            (short_counts[value] - short_draws * probability) / short_sd
+            if short_draws
+            else 0.0
+        )
         draws_since = current_index - 1 - last_seen.get(value, -1)
         overdue_ratio = min(4.0, draws_since * probability)
         scores[value] = {
-            "recent": recent_z,
-            "balanced": 0.55 * recent_z - 0.25 * long_z + 0.12 * (overdue_ratio - 1),
+            "recent": 0.6 * short_z + 0.4 * recent_z,
+            "balanced": 0.4 * short_z + 0.3 * recent_z - 0.15 * long_z + 0.15 * (overdue_ratio - 1),
         }
     return scores
 
@@ -638,20 +710,26 @@ def _special_forecasts(dataset: ProductDataset, seed: str) -> dict[str, list[int
     observations = [item for item in dataset.observations if item.special_values]
     total_counts = Counter(value for item in observations for value in item.special_values)
     recent_window = min(200, len(observations))
+    short_window = min(50, len(observations))
     recent_counts = Counter(
         value for item in observations[-recent_window:] for value in item.special_values
+    )
+    short_counts = Counter(
+        value for item in observations[-short_window:] for value in item.special_values
     )
     pool = list(range(product.special_min, product.special_max + 1))
     expected = product.special_count / len(pool)
     total_sd = math.sqrt(max(len(observations) * expected * (1 - expected), 1e-12))
     recent_sd = math.sqrt(max(recent_window * expected * (1 - expected), 1e-12))
+    short_sd = math.sqrt(max(short_window * expected * (1 - expected), 1e-12))
     score_rows = {}
     for value in pool:
         long_z = (total_counts[value] - len(observations) * expected) / total_sd
         recent_z = (recent_counts[value] - recent_window * expected) / recent_sd
+        short_z = (short_counts[value] - short_window * expected) / short_sd
         score_rows[value] = {
-            "balanced": 0.6 * recent_z - 0.25 * long_z,
-            "recent": recent_z,
+            "balanced": 0.4 * short_z + 0.3 * recent_z - 0.2 * long_z,
+            "recent": 0.6 * short_z + 0.4 * recent_z,
         }
     rng = random.Random(_seed_int(seed + "|special"))
     return {
@@ -674,21 +752,27 @@ def _special_forecasts(dataset: ProductDataset, seed: str) -> dict[str, list[int
 def _digit_sequence_from_scores(
     total: list[Counter[int]],
     recent: list[Counter[int]],
+    short: list[Counter[int]],
+    symbols: list[int],
     strategy: str,
     seed: str,
 ) -> str:
     result = []
-    for position, (total_counter, recent_counter) in enumerate(
-        zip(total, recent, strict=True)
+    for position, (total_counter, recent_counter, short_counter) in enumerate(
+        zip(total, recent, short, strict=True)
     ):
         total_observations = sum(total_counter.values())
         recent_observations = sum(recent_counter.values())
-        expected_total = total_observations / 10 if total_observations else 0
-        expected_recent = recent_observations / 10 if recent_observations else 0
-        total_sd = math.sqrt(max(total_observations * 0.1 * 0.9, 1e-12))
-        recent_sd = math.sqrt(max(recent_observations * 0.1 * 0.9, 1e-12))
+        short_observations = sum(short_counter.values())
+        probability = 1 / len(symbols)
+        expected_total = total_observations * probability if total_observations else 0
+        expected_recent = recent_observations * probability if recent_observations else 0
+        expected_short = short_observations * probability if short_observations else 0
+        total_sd = math.sqrt(max(total_observations * probability * (1 - probability), 1e-12))
+        recent_sd = math.sqrt(max(recent_observations * probability * (1 - probability), 1e-12))
+        short_sd = math.sqrt(max(short_observations * probability * (1 - probability), 1e-12))
         scores = {}
-        for digit in range(10):
+        for digit in symbols:
             long_z = (
                 (total_counter[digit] - expected_total) / total_sd
                 if total_observations
@@ -699,7 +783,16 @@ def _digit_sequence_from_scores(
                 if recent_observations
                 else 0
             )
-            score = recent_z if strategy == "recent" else 0.65 * recent_z - 0.25 * long_z
+            short_z = (
+                (short_counter[digit] - expected_short) / short_sd
+                if short_observations
+                else 0
+            )
+            score = (
+                0.6 * short_z + 0.4 * recent_z
+                if strategy == "recent"
+                else 0.4 * short_z + 0.3 * recent_z - 0.2 * long_z
+            )
             scores[digit] = score + _stable_jitter(f"{seed}|{position}", digit) * 1e-6
         result.append(str(max(scores, key=scores.get)))
     return "".join(result)
@@ -778,9 +871,28 @@ def _first_observation_after(
     return None
 
 
-def _prediction_order(prediction: dict[str, Any]) -> tuple[str, int | str]:
-    draw_id = prediction["dataset_cutoff_draw_id"]
-    return prediction["dataset_cutoff_date"], int(draw_id) if draw_id.isdigit() else draw_id
+def _prediction_order(
+    prediction: dict[str, Any],
+) -> tuple[str, int | str, tuple[int, ...], str, str]:
+    draw_id = str(prediction["dataset_cutoff_draw_id"])
+    draw_key: int | str = int(draw_id) if draw_id.isdigit() else draw_id
+    return (
+        prediction["dataset_cutoff_date"],
+        draw_key,
+        _version_key(str(prediction.get("model_version", ""))),
+        str(prediction.get("generated_at", "")),
+        str(prediction.get("prediction_id", "")),
+    )
+
+
+def _version_key(version: str) -> tuple[int, ...]:
+    parts: list[int] = []
+    for part in version.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
 
 
 def _evaluation_detail(

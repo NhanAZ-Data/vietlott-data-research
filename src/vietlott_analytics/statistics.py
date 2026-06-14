@@ -281,6 +281,7 @@ def _number_set_report(dataset: ProductDataset) -> dict[str, object]:
 def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
     product = dataset.product
     sequence_length = product.sequence_length or 0
+    symbols = list(range(product.sequence_min, product.sequence_max + 1))
     observations = dataset.observations
     digit_counts = Counter()
     position_counts = [Counter() for _ in range(sequence_length)]
@@ -307,11 +308,13 @@ def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
             for position, digit in enumerate(digits):
                 position_counts[position][digit] += 1
 
-    expected_per_digit = total_outcomes * sequence_length / 10 if total_outcomes else 0
+    expected_per_digit = (
+        total_outcomes * sequence_length / len(symbols) if total_outcomes else 0
+    )
     chi_square = (
         sum(
             ((digit_counts[digit] - expected_per_digit) ** 2) / expected_per_digit
-            for digit in range(10)
+            for digit in symbols
         )
         if expected_per_digit
         else 0
@@ -328,10 +331,10 @@ def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
                     if total_outcomes
                     else 0,
                 }
-                for digit in range(10)
+                for digit in symbols
             ],
             "normalized_entropy": _round(
-                _normalized_entropy(counter[digit] for digit in range(10)),
+                _normalized_entropy(counter[digit] for digit in symbols),
                 8,
             ),
         }
@@ -348,11 +351,11 @@ def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
                     "rate_per_position": _round(
                         month_counts[month][digit]
                         / (month_outcomes[month] * sequence_length)
-                        if month_outcomes[month]
-                        else 0
+                    if month_outcomes[month]
+                    else 0
                     ),
                 }
-                for digit in range(10)
+                for digit in symbols
             ],
         }
         for month in range(1, 13)
@@ -360,7 +363,7 @@ def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
 
     bingo_total_test = None
     if product.slug == "bingo18":
-        expected_sum_probabilities = _digit_sum_probabilities(sequence_length)
+        expected_sum_probabilities = _sequence_sum_probabilities(sequence_length, symbols)
         bingo_chi_square = 0.0
         for total, probability in expected_sum_probabilities.items():
             expected = len(observations) * probability
@@ -393,11 +396,13 @@ def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
         "average_outcomes_per_draw": _round(total_outcomes / len(observations)),
         "uniformity": {
             "chi_square": _round(chi_square),
-            "degrees_of_freedom": 9,
-            "approximate_p_value": _round(_chi_square_survival_approx(chi_square, 9), 8),
+            "degrees_of_freedom": len(symbols) - 1,
+            "approximate_p_value": _round(
+                _chi_square_survival_approx(chi_square, len(symbols) - 1), 8
+            ),
             "cohens_w": _round(math.sqrt(chi_square / total_digits)) if total_digits else 0,
             "normalized_entropy": _round(
-                _normalized_entropy(digit_counts[digit] for digit in range(10)),
+                _normalized_entropy(digit_counts[digit] for digit in symbols),
                 8,
             ),
         },
@@ -407,7 +412,7 @@ def _digit_sequence_report(dataset: ProductDataset) -> dict[str, object]:
                 "count": digit_counts[digit],
                 "rate": _round(digit_counts[digit] / total_digits) if total_digits else 0,
             }
-            for digit in range(10)
+            for digit in symbols
         ],
         "positions": position_rows,
         "months": month_rows,
@@ -576,15 +581,15 @@ def _normalized_entropy(counts: Iterable[int]) -> float:
     return entropy / math.log(len(values))
 
 
-def _digit_sum_probabilities(length: int) -> dict[int, float]:
+def _sequence_sum_probabilities(length: int, symbols: list[int]) -> dict[int, float]:
     counts = Counter({0: 1})
     for _ in range(length):
         next_counts = Counter()
         for subtotal, count in counts.items():
-            for digit in range(10):
-                next_counts[subtotal + digit] += count
+            for symbol in symbols:
+                next_counts[subtotal + symbol] += count
         counts = next_counts
-    total = 10**length
+    total = len(symbols) ** length
     return {value: count / total for value, count in sorted(counts.items())}
 
 

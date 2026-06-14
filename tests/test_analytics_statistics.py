@@ -57,7 +57,7 @@ def test_digit_report_preserves_position_information() -> None:
         Observation(
             draw_id=str(index + 1).zfill(7),
             draw_date=start + timedelta(days=index // 10),
-            outcomes=(f"{index % 10}{(index + 1) % 10}{(index + 2) % 10}",),
+            outcomes=(f"{index % 6 + 1}{(index + 1) % 6 + 1}{(index + 2) % 6 + 1}",),
         )
         for index in range(100)
     ]
@@ -75,5 +75,5 @@ def test_digit_report_preserves_position_information() -> None:
     assert analysis["sequence_length"] == 3
     assert analysis["outcomes"] == 100
     assert len(analysis["positions"]) == 3
-    assert all(len(position["values"]) == 10 for position in analysis["positions"])
-    assert analysis["bingo_total_test"]["degrees_of_freedom"] == 27
+    assert all(len(position["values"]) == 6 for position in analysis["positions"])
+    assert analysis["bingo_total_test"]["degrees_of_freedom"] == 15

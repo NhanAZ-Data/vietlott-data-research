@@ -79,6 +79,41 @@ def test_walk_forward_backtest_reports_uniform_baseline() -> None:
     assert "approximate_p_value" in report["comparison"]
 
 
+def test_prediction_report_prefers_newer_model_for_same_cutoff(tmp_path) -> None:
+    older = {
+        "event_type": "prediction",
+        "prediction_id": "older-model",
+        "product": "mega645",
+        "strategy": "balanced_signal",
+        "strategy_label": "balanced",
+        "model_version": "1.0.0",
+        "generated_at": "2026-06-14T12:00:00+00:00",
+        "dataset_cutoff_draw_id": "00100",
+        "dataset_cutoff_date": "2026-06-13",
+        "dataset_fingerprint": "same-cutoff",
+        "target": "first_confirmed_draw_after_cutoff",
+        "prediction": {"numbers": [1, 2, 3, 4, 5, 6], "special_numbers": []},
+        "parameters": {"selection_count": 6},
+        "research_only": True,
+    }
+    newer = {
+        **older,
+        "prediction_id": "newer-model",
+        "model_version": "1.1.0",
+        "generated_at": "2026-06-13T12:00:00+00:00",
+        "prediction": {"numbers": [7, 8, 9, 10, 11, 12], "special_numbers": []},
+    }
+
+    report = PredictionLedger(
+        path=tmp_path / "ledger.jsonl",
+        events=[older, newer],
+    ).site_report()
+
+    [latest] = report["latest"]["mega645"]
+    assert latest["prediction_id"] == "newer-model"
+    assert latest["prediction"]["numbers"] == [7, 8, 9, 10, 11, 12]
+
+
 def test_prediction_report_uses_strict_exact_and_near_rules(tmp_path) -> None:
     base_prediction = {
         "event_type": "prediction",

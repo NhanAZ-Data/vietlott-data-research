@@ -52,7 +52,9 @@ def test_finalize_audits_adds_global_correction_and_jsonl_events() -> None:
         Observation(
             draw_id=str(index + 1).zfill(7),
             draw_date=date(2025, 1, 1) + timedelta(days=index // 10),
-            outcomes=(f"{index % 10}{(index + 3) % 10}{(index + 7) % 10}",),
+            outcomes=(
+                f"{index % 6 + 1}{(index + 3) % 6 + 1}{(index + 5) % 6 + 1}",
+            ),
         )
         for index in range(120)
     ]

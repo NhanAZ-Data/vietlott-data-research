@@ -271,6 +271,8 @@ def _number_set_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
 def _digit_sequence_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
     product = dataset.product
     length = product.sequence_length or 0
+    symbols = _sequence_symbols(product)
+    symbol_count = len(symbols)
     observations = dataset.observations
     outcomes = [
         outcome
@@ -279,7 +281,7 @@ def _digit_sequence_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
         if len(outcome) == length and outcome.isdigit()
     ]
     digit_counts = Counter(int(char) for outcome in outcomes for char in outcome)
-    expected_per_digit = len(outcomes) * length / 10 if outcomes else 0
+    expected_per_symbol = len(outcomes) * length / symbol_count if outcomes else 0
     numeric_values = [int(outcome) for outcome in outcomes]
     digit_sums = [sum(int(char) for char in outcome) for outcome in outcomes]
 
@@ -288,10 +290,10 @@ def _digit_sequence_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
             test_id="digit_marginal_chi_square",
             family="distribution_fit",
             algorithm="Chi-Square Goodness-of-Fit Test",
-            label="Tần suất chữ số 0 đến 9",
-            plain_language="Mỗi chữ số nên xuất hiện gần 10% trên toàn bộ vị trí quan sát.",
-            observed=[digit_counts[digit] for digit in range(10)],
-            expected=[expected_per_digit for _ in range(10)],
+            label=f"Tần suất giá trị {product.sequence_min} đến {product.sequence_max}",
+            plain_language="Mỗi giá trị hợp lệ nên xuất hiện gần đều trên toàn bộ vị trí quan sát.",
+            observed=[digit_counts[digit] for digit in symbols],
+            expected=[expected_per_symbol for _ in symbols],
             sample_size=len(outcomes),
             effect_denominator=len(outcomes) * length,
             effect_label="Cohen's w",
@@ -300,16 +302,16 @@ def _digit_sequence_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
         _g_test(
             test_id="digit_marginal_g_test",
             family="distribution_fit",
-            label="G-test cho tần suất chữ số",
-            plain_language="Đo độ lệch chữ số bằng tỷ lệ hợp lý likelihood.",
-            observed=[digit_counts[digit] for digit in range(10)],
-            expected=[expected_per_digit for _ in range(10)],
+            label="G-test cho tần suất giá trị",
+            plain_language="Đo độ lệch giá trị bằng tỷ lệ hợp lý likelihood.",
+            observed=[digit_counts[digit] for digit in symbols],
+            expected=[expected_per_symbol for _ in symbols],
             sample_size=len(outcomes),
             effect_denominator=len(outcomes) * length,
             practical_threshold=0.05,
         ),
-        _digit_position_test(dataset, outcomes),
-        _digit_sum_distribution_test(outcomes, length),
+        _digit_position_test(dataset, outcomes, symbols),
+        _digit_sum_distribution_test(outcomes, length, symbols),
         _runs_test(
             test_id="digit_value_runs",
             label="Runs test trên giá trị chuỗi",
@@ -333,7 +335,7 @@ def _digit_sequence_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
             ),
         ),
         _month_heterogeneity_digit_test(dataset),
-        _repeat_rate_test(outcomes, length),
+        _repeat_rate_test(outcomes, length, symbols),
     ]
     return [test for test in tests if test is not None]
 
@@ -574,6 +576,7 @@ def _month_heterogeneity_number_test(
 def _month_heterogeneity_digit_test(dataset: ProductDataset) -> dict[str, Any] | None:
     product = dataset.product
     length = product.sequence_length or 0
+    symbols = _sequence_symbols(product)
     month_counts = {month: Counter() for month in range(1, 13)}
     month_outcomes = Counter()
     for observation in dataset.observations:
@@ -589,18 +592,18 @@ def _month_heterogeneity_digit_test(dataset: ProductDataset) -> dict[str, Any] |
     statistic = 0.0
     total_digits = 0
     for month in months:
-        expected = month_outcomes[month] * length / 10
+        expected = month_outcomes[month] * length / len(symbols)
         total_digits += month_outcomes[month] * length
-        for digit in range(10):
+        for digit in symbols:
             if expected > 0:
                 statistic += (month_counts[month][digit] - expected) ** 2 / expected
-    degrees = max(1, (len(months) - 1) * 9)
+    degrees = max(1, (len(months) - 1) * (len(symbols) - 1))
     return _test_result(
         test_id="digit_month_heterogeneity",
         family="seasonality",
         algorithm="Month-by-Digit Chi-Square Test",
-        label="Tần suất chữ số theo tháng",
-        plain_language="So từng tháng với tần suất nền của chữ số 0 đến 9.",
+        label="Tần suất giá trị theo tháng",
+        plain_language="So từng tháng với tần suất nền của các giá trị hợp lệ.",
         statistic_name="chi_square",
         statistic=statistic,
         degrees_of_freedom=degrees,
@@ -746,7 +749,11 @@ def _odd_count_test(dataset: ProductDataset) -> dict[str, Any] | None:
     )
 
 
-def _digit_position_test(dataset: ProductDataset, outcomes: list[str]) -> dict[str, Any] | None:
+def _digit_position_test(
+    dataset: ProductDataset,
+    outcomes: list[str],
+    symbols: list[int],
+) -> dict[str, Any] | None:
     product = dataset.product
     length = product.sequence_length or 0
     if not outcomes or not length:
@@ -755,23 +762,23 @@ def _digit_position_test(dataset: ProductDataset, outcomes: list[str]) -> dict[s
     for outcome in outcomes:
         for position, char in enumerate(outcome):
             position_counts[position][int(char)] += 1
-    expected = len(outcomes) / 10
+    expected = len(outcomes) / len(symbols)
     statistic = sum(
         ((counter[digit] - expected) ** 2) / expected
         for counter in position_counts
-        for digit in range(10)
+        for digit in symbols
         if expected > 0
     )
     return _test_result(
         test_id="digit_position_chi_square",
         family="distribution_fit",
         algorithm="Position-wise Chi-Square Test",
-        label="Tần suất chữ số theo vị trí",
-        plain_language="Mỗi vị trí của chuỗi nên có chữ số 0 đến 9 gần đều nhau.",
+        label="Tần suất giá trị theo vị trí",
+        plain_language="Mỗi vị trí của chuỗi nên có các giá trị hợp lệ gần đều nhau.",
         statistic_name="chi_square",
         statistic=statistic,
-        degrees_of_freedom=length * 9,
-        p_value=_chi_square_survival_approx(statistic, length * 9),
+        degrees_of_freedom=length * (len(symbols) - 1),
+        p_value=_chi_square_survival_approx(statistic, length * (len(symbols) - 1)),
         effect_size_name="position digit w",
         effect_size=math.sqrt(statistic / (len(outcomes) * length)),
         practical_threshold=0.05,
@@ -779,10 +786,14 @@ def _digit_position_test(dataset: ProductDataset, outcomes: list[str]) -> dict[s
     )
 
 
-def _digit_sum_distribution_test(outcomes: list[str], length: int) -> dict[str, Any] | None:
+def _digit_sum_distribution_test(
+    outcomes: list[str],
+    length: int,
+    symbols: list[int],
+) -> dict[str, Any] | None:
     if not outcomes or not length:
         return None
-    probabilities = _digit_sum_probabilities(length)
+    probabilities = _sequence_sum_probabilities(length, symbols)
     observed = Counter(sum(int(char) for char in outcome) for outcome in outcomes)
     statistic = 0.0
     for total, probability in probabilities.items():
@@ -806,10 +817,14 @@ def _digit_sum_distribution_test(outcomes: list[str], length: int) -> dict[str, 
     )
 
 
-def _repeat_rate_test(outcomes: list[str], length: int) -> dict[str, Any] | None:
+def _repeat_rate_test(
+    outcomes: list[str],
+    length: int,
+    symbols: list[int],
+) -> dict[str, Any] | None:
     if len(outcomes) < 2 or length <= 0:
         return None
-    space = 10**length
+    space = len(symbols) ** length
     counts = Counter(outcomes)
     observed_pairs = sum(count * (count - 1) / 2 for count in counts.values())
     expected_pairs = len(outcomes) * (len(outcomes) - 1) / (2 * space)
@@ -1093,15 +1108,19 @@ def _correlation(left: list[int], right: list[int]) -> float:
     return numerator / denominator if denominator else 0.0
 
 
-def _digit_sum_probabilities(length: int) -> dict[int, float]:
+def _sequence_symbols(product) -> list[int]:
+    return list(range(product.sequence_min, product.sequence_max + 1))
+
+
+def _sequence_sum_probabilities(length: int, symbols: list[int]) -> dict[int, float]:
     counts = Counter({0: 1})
     for _ in range(length):
         next_counts = Counter()
         for subtotal, count in counts.items():
-            for digit in range(10):
-                next_counts[subtotal + digit] += count
+            for symbol in symbols:
+                next_counts[subtotal + symbol] += count
         counts = next_counts
-    total = 10**length
+    total = len(symbols) ** length
     return {value: count / total for value, count in sorted(counts.items())}
 
 
