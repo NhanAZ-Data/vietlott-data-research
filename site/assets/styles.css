@@ -639,7 +639,239 @@ a {
   color: var(--ink-soft);
 }
 
-.audit-conclusion-card a {
+.audit-conclusion-card small {
+  color: #71807c;
+  font-weight: 800;
+}
+
+.audit-log-panel {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgb(255 253 247 / 72%);
+  box-shadow: var(--shadow);
+}
+
+.audit-log-panel summary {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.audit-log-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.audit-log-panel summary::after {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  content: "+";
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.audit-log-panel[open] summary::after {
+  content: "-";
+}
+
+.audit-log-panel summary span {
+  color: #426a66;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.audit-log-panel summary strong {
+  color: var(--forest);
+}
+
+.audit-log-visual {
+  display: grid;
+  gap: 14px;
+  padding: 0 24px 24px;
+}
+
+.audit-log-lead,
+.audit-signal-card,
+.audit-product-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fbf8ef;
+}
+
+.audit-log-lead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+}
+
+.audit-log-lead span,
+.audit-signal-card span,
+.audit-product-top span {
+  display: block;
+  color: #55716d;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.audit-log-lead strong,
+.audit-signal-card strong {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+.audit-log-statuses,
+.audit-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.audit-status-pill {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #edf0e6;
+  color: #50605c;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.audit-status-pill.watch {
+  background: rgb(239 179 76 / 18%);
+  color: #8a5b12;
+}
+
+.audit-status-pill.review {
+  background: rgb(237 118 95 / 18%);
+  color: #9d3c2b;
+}
+
+.audit-status-pill.skipped {
+  background: #ebe3d2;
+  color: #756751;
+}
+
+.audit-signal-card {
+  padding: 18px;
+  border-left-width: 5px;
+}
+
+.audit-signal-card.watch,
+.audit-product-card.watch {
+  border-left-color: var(--amber);
+}
+
+.audit-signal-card.review,
+.audit-product-card.review {
+  border-left-color: var(--coral);
+}
+
+.audit-signal-card.pass,
+.audit-product-card.pass {
+  border-left-color: #9ab7a5;
+}
+
+.audit-signal-card.skipped,
+.audit-product-card.skipped {
+  border-left-color: #b9b3a5;
+}
+
+.audit-signal-card p {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+}
+
+.audit-log-products {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.audit-product-card {
+  padding: 16px;
+  border-left-width: 5px;
+}
+
+.audit-product-top {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.audit-product-top strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.audit-product-top small {
+  flex: 0 0 auto;
+  color: #6d7976;
+  font-weight: 800;
+}
+
+.audit-product-card .audit-status-pills {
+  margin-top: 12px;
+}
+
+.audit-signal {
+  display: grid;
+  gap: 3px;
+  margin: 14px 0 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f0eadf;
+}
+
+.audit-signal b,
+.audit-signal span,
+.audit-signal em {
+  display: block;
+}
+
+.audit-signal span,
+.audit-product-card > p {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.audit-signal em {
+  color: #5b6d69;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.audit-product-card > p {
+  margin: 12px 0 0;
+}
+
+.audit-log-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.audit-log-actions a {
   padding: 10px 14px;
   border: 1px solid var(--forest);
   border-radius: 999px;
@@ -1855,6 +2087,8 @@ a {
   }
 
   .audit-conclusion-card,
+  .audit-log-lead,
+  .audit-log-products,
   .audit-test-row {
     grid-template-columns: 1fr;
   }
@@ -1938,6 +2172,8 @@ a {
   .audit-summary-grid,
   .audit-mini-grid,
   .audit-family-list,
+  .audit-log-lead,
+  .audit-log-products,
   .two-column,
   .recent-draws,
   .method-steps,
@@ -1962,6 +2198,15 @@ a {
   .audit-conclusion-card,
   .audit-test-row {
     grid-template-columns: 1fr;
+  }
+
+  .audit-log-panel summary {
+    align-items: flex-start;
+  }
+
+  .audit-log-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .audit-test-row dl {

@@ -1,6 +1,7 @@
 const state = {
   manifest: null,
   predictions: null,
+  auditSummary: null,
   product: null,
   selectedNumber: null,
   reportCache: new Map(),
@@ -21,13 +22,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function initialize() {
   const initialHash = window.location.hash;
-  const [manifest, predictions] = await Promise.all([
+  const [manifest, predictions, auditSummary] = await Promise.all([
     fetchJson("data/manifest.json"),
     fetchJson("data/predictions.json"),
+    fetchJson("data/audit-summary.json"),
   ]);
   state.manifest = manifest;
   state.predictions = predictions;
+  state.auditSummary = auditSummary;
   renderManifest(manifest);
+  renderAuditOverview(auditSummary);
   renderProductTabs(manifest.products);
   renderPredictionShell(predictions, manifest.products);
 
@@ -128,7 +132,6 @@ function renderManifest(manifest) {
   text("unconfirmed-count", numberFormatter.format(manifest.not_confirmed_rows));
   text("prize-count", numberFormatter.format(manifest.prize_rows));
   text("method-version", manifest.methodology_version);
-  renderAuditOverview(manifest.fairness_audit);
 }
 
 function renderProductTabs(products) {
@@ -312,13 +315,121 @@ function renderUniformity(uniformity, kind) {
     .join("");
 }
 
-function renderAuditOverview(summary) {
-  if (!summary) return;
+function renderAuditOverview(report) {
+  if (!report) return;
+  const summary = report.summary || report;
   const counts = summary.status_counts || {};
   text("audit-test-count", numberFormatter.format(summary.test_count || 0));
   text("audit-review-count", numberFormatter.format(counts.review || 0));
   text("audit-watch-count", numberFormatter.format(counts.watch || 0));
   text("audit-global-conclusion", summary.conclusion || "Chưa có kết luận kiểm định.");
+  text(
+    "audit-log-summary",
+    `${numberFormatter.format(summary.test_count || 0)} kiểm định, `
+    + `${numberFormatter.format(summary.product_count || 0)} sản phẩm, `
+    + `${numberFormatter.format(counts.watch || 0)} theo dõi`,
+  );
+  renderAuditVisualLog(report);
+}
+
+function renderAuditVisualLog(report) {
+  const container = document.getElementById("audit-log-visual");
+  if (!container) return;
+  const summary = report.summary || {};
+  const products = report.products || [];
+  const strongest = summary.strongest_signal;
+  const statusCounts = summary.status_counts || {};
+  const productsHtml = [...products]
+    .sort((left, right) => auditProductRank(left) - auditProductRank(right))
+    .map(renderAuditProductCard)
+    .join("");
+  container.innerHTML = `
+    <div class="audit-log-lead">
+      <div>
+        <span>Tóm tắt toàn cục</span>
+        <strong>${escapeHtml(summary.conclusion || "Chưa có kết luận.")}</strong>
+      </div>
+      <div class="audit-log-statuses">
+        ${renderAuditStatusPill("pass", statusCounts.pass || 0)}
+        ${renderAuditStatusPill("watch", statusCounts.watch || 0)}
+        ${renderAuditStatusPill("review", statusCounts.review || 0)}
+        ${renderAuditStatusPill("skipped", statusCounts.skipped || 0)}
+      </div>
+    </div>
+    ${strongest ? `
+      <article class="audit-signal-card ${escapeHtml(strongest.status)}">
+        <span>Tín hiệu mạnh nhất trong snapshot</span>
+        <strong>${escapeHtml(strongest.label)}</strong>
+        <p>
+          ${escapeHtml(strongest.algorithm)}.
+          q toàn cục ${formatPValue(strongest.q_value_global_bh ?? strongest.q_value_bh)}.
+          ${escapeHtml(strongest.interpretation)}
+        </p>
+      </article>` : ""}
+    <div class="audit-log-products">
+      ${productsHtml}
+    </div>`;
+}
+
+function renderAuditProductCard(product) {
+  const counts = product.status_counts || {};
+  const status = auditProductStatus(product);
+  const signal = product.strongest_signal;
+  const qValue = signal?.q_value_global_bh ?? signal?.q_value_bh;
+  return `
+    <article class="audit-product-card ${escapeHtml(status)}">
+      <div class="audit-product-top">
+        <div>
+          <span>${escapeHtml(auditStatusLabel(status))}</span>
+          <strong>${escapeHtml(product.name)}</strong>
+        </div>
+        <small>${numberFormatter.format(product.history_draws || 0)} kỳ</small>
+      </div>
+      <div class="audit-status-pills">
+        ${renderAuditStatusPill("pass", counts.pass || 0)}
+        ${renderAuditStatusPill("watch", counts.watch || 0)}
+        ${renderAuditStatusPill("review", counts.review || 0)}
+        ${renderAuditStatusPill("skipped", counts.skipped || 0)}
+      </div>
+      ${signal ? `
+        <p class="audit-signal">
+          <b>${escapeHtml(signal.label)}</b>
+          <span>${escapeHtml(signal.algorithm)}</span>
+          <em>q ${qValue == null ? "N/A" : formatPValue(qValue)}</em>
+        </p>` : ""}
+      <p>${escapeHtml(product.conclusion || "")}</p>
+    </article>`;
+}
+
+function renderAuditStatusPill(status, value) {
+  return `
+    <span class="audit-status-pill ${escapeHtml(status)}">
+      ${escapeHtml(auditStatusLabel(status))}
+      <b>${numberFormatter.format(value)}</b>
+    </span>`;
+}
+
+function auditProductStatus(product) {
+  const counts = product.status_counts || {};
+  if (counts.review) return "review";
+  if (counts.watch) return "watch";
+  if (counts.skipped) return "skipped";
+  return "pass";
+}
+
+function auditProductRank(product) {
+  const order = { review: 0, watch: 1, skipped: 2, pass: 3 };
+  return order[auditProductStatus(product)] ?? 4;
+}
+
+function auditStatusLabel(status) {
+  const labels = {
+    pass: "Bình thường",
+    watch: "Theo dõi",
+    review: "Đọc kỹ",
+    skipped: "Tạm hoãn",
+  };
+  return labels[status] || status;
 }
 
 function renderFairnessAudit(audit) {
@@ -380,12 +491,6 @@ function renderFairnessAudit(audit) {
 
 function renderAuditTestRow(test) {
   const qValue = test.q_value_global_bh ?? test.q_value_bh;
-  const statusCopy = {
-    pass: "Bình thường",
-    watch: "Theo dõi",
-    review: "Đọc kỹ",
-    skipped: "Tạm hoãn",
-  };
   const pValue = test.p_value == null ? "N/A" : formatPValue(test.p_value);
   const qDisplay = qValue == null ? "N/A" : formatPValue(qValue);
   const effect = test.effect_size == null ? "N/A" : formatDecimal(test.effect_size, 4);
@@ -397,7 +502,7 @@ function renderAuditTestRow(test) {
         <p>${escapeHtml(test.plain_language)}</p>
       </div>
       <dl>
-        <div><dt>Trạng thái</dt><dd>${escapeHtml(statusCopy[test.status] || test.status)}</dd></div>
+        <div><dt>Trạng thái</dt><dd>${escapeHtml(auditStatusLabel(test.status))}</dd></div>
         <div><dt>p</dt><dd>${escapeHtml(pValue)}</dd></div>
         <div><dt>q</dt><dd>${escapeHtml(qDisplay)}</dd></div>
         <div><dt>Độ lớn</dt><dd>${escapeHtml(effect)}</dd></div>

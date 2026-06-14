@@ -17,10 +17,10 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert 'id="phan-tich"' in index
     assert 'id="du-doan"' in index
     assert 'id="kiem-dinh"' in index
-    assert "assets/app.js?v=20260614-6" in index
+    assert "assets/app.js?v=20260614-7" in index
     assert "assets/docs.js?v=20260614-2" in data_page
     for page in (index, method_page, data_page):
-        assert "assets/styles.css?v=20260614-6" in page
+        assert "assets/styles.css?v=20260614-7" in page
         assert "fonts.googleapis.com/css2?family=Noto+Serif" in page
         assert "cdn-uicons.flaticon.com/3.0.0" in page
         assert "fi-rr-crystal-ball" in page
@@ -36,6 +36,8 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "Chọn ngẫu nhiên có thể lặp lại" in app_script
     assert "Kết luận: cách kết hợp dấu hiệu chưa tốt hơn chọn ngẫu nhiên." in app_script
     assert "renderFairnessAudit" in app_script
+    assert "renderAuditVisualLog" in app_script
+    assert "audit-log-visual" in index
     assert "audit-log.jsonl" in index
     assert "audit-summary.json" in data_page
     assert '{ cache: "no-store" }' in app_script

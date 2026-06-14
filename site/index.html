@@ -13,8 +13,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,500;1,400;1,500&amp;display=swap">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
-  <link rel="stylesheet" href="assets/styles.css?v=20260614-6">
-  <script src="assets/app.js?v=20260614-6" defer></script>
+  <link rel="stylesheet" href="assets/styles.css?v=20260614-7">
+  <script src="assets/app.js?v=20260614-7" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Bỏ qua điều hướng</a>
@@ -191,8 +191,19 @@
       <div class="audit-conclusion-card">
         <span>Kết luận snapshot hiện tại</span>
         <p id="audit-global-conclusion">Đang đọc bộ kiểm định...</p>
-        <a href="data/audit-log.jsonl">Tải log kiểm định JSONL</a>
+        <small>Nhấn mở bảng log bên dưới để đọc trực quan.</small>
       </div>
+      <details class="audit-log-panel">
+        <summary>
+          <span>Log kiểm định trực quan</span>
+          <strong id="audit-log-summary">Đang đọc dữ liệu kiểm định...</strong>
+        </summary>
+        <div id="audit-log-visual" class="audit-log-visual"></div>
+        <div class="audit-log-actions">
+          <a href="data/audit-summary.json">Tải tóm tắt JSON</a>
+          <a href="data/audit-log.jsonl">Tải JSONL thô</a>
+        </div>
+      </details>
     </section>
 
     <section id="phan-tich" class="analysis-section shell">
