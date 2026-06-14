@@ -1,0 +1,117 @@
+name: Quy trình cập nhật dataset dùng chung
+
+on:
+  workflow_call:
+    inputs:
+      products:
+        description: Danh sách sản phẩm, cách nhau bằng khoảng trắng
+        required: true
+        type: string
+      report_name:
+        description: Tên ngắn dùng cho artifact
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vietlott-dataset-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Cập nhật và kiểm tra dữ liệu
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUNBUFFERED: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Cài Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cài chương trình
+        run: python -m pip install -e .
+
+      - name: Khôi phục kho làm việc
+        run: vietlott-repository-data hydrate --source-dir datasets --destination-dir data
+
+      - name: Đọc kỳ mới từ nguồn ưu tiên
+        id: update
+        continue-on-error: true
+        shell: bash
+        env:
+          PRODUCTS: ${{ inputs.products }}
+        run: |
+          read -r -a selected_products <<< "$PRODUCTS"
+          vietlott-auto-update \
+            --products "${selected_products[@]}" \
+            --output-dir data \
+            --reconcile-pages 2 \
+            --request-delay 0.8 \
+            --jitter 0.25 \
+            --retries 5 \
+            --strict
+
+      - name: Đóng gói và kiểm tra dataset
+        shell: bash
+        run: |
+          report_dir="$RUNNER_TEMP/vietlott-reports"
+          mkdir -p "$report_dir"
+          if test -f data/incremental-update-report.json; then
+            cp data/incremental-update-report.json "$report_dir/update-report.json"
+          fi
+          vietlott-repository-data publish \
+            --source-dir data \
+            --destination-dir datasets \
+            > "$report_dir/publish-report.json"
+          vietlott-repository-data validate \
+            --source-dir datasets \
+            > "$report_dir/validation-report.json"
+
+      - name: Ghi tóm tắt lần cập nhật
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: >
+          python scripts/github_update_summary.py
+          --update-report "$RUNNER_TEMP/vietlott-reports/update-report.json"
+          --validation-report "$RUNNER_TEMP/vietlott-reports/validation-report.json"
+          --output "$GITHUB_STEP_SUMMARY"
+
+      - name: Lưu báo cáo chẩn đoán
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: vietlott-${{ inputs.report_name }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/vietlott-reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Commit khi dữ liệu thay đổi
+        shell: bash
+        run: |
+          git add datasets
+          if git diff --cached --quiet; then
+            echo "Không có kỳ mới hoặc thay đổi chính thức"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "data: cập nhật kết quả Vietlott"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Báo lỗi nguồn sau khi bảo toàn dữ liệu hợp lệ
+        if: steps.update.outcome == 'failure'
+        run: exit 1

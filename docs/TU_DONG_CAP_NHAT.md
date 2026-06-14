@@ -36,6 +36,10 @@ chậm. Việc kiểm tra thêm sản phẩm chỉ tạo vài request và giúp 
 
 `ci.yml` chạy unit test, Ruff và kiểm tra toàn vẹn dataset khi mã nguồn thay đổi.
 
+`update-dataset.yml` là reusable workflow dùng chung cho hai lịch cập nhật. Hai
+workflow lịch chỉ truyền nhóm sản phẩm và tên báo cáo. Cách tổ chức này ngăn hai
+quy trình bị lệch phiên bản action, tham số retry hoặc bước kiểm tra.
+
 ## Chịu lỗi và độ trễ
 
 Lịch workflow chỉ là lịch thăm dò. Chương trình không tạo bản ghi vì đồng hồ đã
@@ -69,7 +73,8 @@ dữ liệu ngừng cập nhật bất thường.
 7. Áp dụng danh sách kỳ không được xác nhận.
 8. Kiểm tra trùng, thiếu, JSON, khóa ngoại và kích thước tệp.
 9. Chia lại dữ liệu theo sản phẩm và tháng.
-10. Commit và push chỉ khi `datasets` thay đổi.
+10. Ghi bảng tóm tắt vào trang run và lưu báo cáo JSON dưới dạng artifact trong 14 ngày.
+11. Commit và push chỉ khi `datasets` thay đổi.
 
 Hai workflow dùng cùng một concurrency group nên không ghi đè nhau. Quyền
 `GITHUB_TOKEN` chỉ cấp `contents: write`.
