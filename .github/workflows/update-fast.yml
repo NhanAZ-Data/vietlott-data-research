@@ -35,7 +35,7 @@ jobs:
       - name: Khôi phục kho làm việc
         run: vietlott-repository-data hydrate --source-dir datasets --destination-dir data
 
-      - name: Đọc kỳ mới từ nguồn chính thức
+      - name: Đọc kỳ mới từ nguồn ưu tiên
         id: update
         continue-on-error: true
         run: >

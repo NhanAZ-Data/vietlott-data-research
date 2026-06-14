@@ -12,6 +12,12 @@ OfficialVietlottSource
  |-- POST AjaxPro cho các trang tiếp theo
  `-- GET trang chi tiết khi cần giải thưởng
  |
+ | lỗi truy cập
+ v
+SecondaryResultSource
+ |
+ `-- GET trang kết quả công khai của Xổ Số Minh Ngọc
+ |
  v
 Parser theo họ sản phẩm
  |
@@ -40,6 +46,10 @@ Repository data publisher
 `sources/vietlott.py` giao tiếp với trang chính thức. Khóa AjaxPro động được đọc
 từ HTML thay vì lưu cứng.
 
+`sources/secondary.py` đọc trang kết quả công khai của Xổ Số Minh Ngọc khi cả
+trang HTML và AjaxPro chính thức đều không truy cập được từ GitHub Actions.
+Nguồn này chỉ được kích hoạt sau khi nguồn chính thức thất bại.
+
 `parsers` chuyển từng họ HTML thành `DrawRecord` và `PrizeRecord`.
 
 `validation.py` kiểm tra số lượng phần tử, miền giá trị, trùng số và cấu trúc giải.
@@ -66,6 +76,8 @@ sách ngoại lệ chính thức, xuất dữ liệu và báo cáo kiểm toán.
 - Mỗi lần chạy có thể bắt kịp nhiều trang
 - Bản ghi trùng được upsert
 - Bản ghi bị rút xác nhận không bị xóa
+- Bản ghi nguồn phụ được gắn trạng thái chờ Vietlott đối chiếu
+- Kết quả nguồn phụ không được ghi nếu xung đột với bản ghi đang có
 - Workflow không commit nếu dữ liệu không đổi
 - Mọi tệp được kiểm tra trước khi push
 

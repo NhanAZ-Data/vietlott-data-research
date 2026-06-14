@@ -418,6 +418,8 @@ class SqliteDatasetStore:
                     continue
                 attributes.pop("secondary_source_url", None)
                 attributes.pop("upstream_claimed_source", None)
+                attributes.pop("official_verification_status", None)
+                attributes.pop("secondary_prize_source_url", None)
                 attributes["data_source"] = "official_vietlott"
                 attributes["official_list_verified_at"] = row["fetched_at"]
                 self.connection.execute(

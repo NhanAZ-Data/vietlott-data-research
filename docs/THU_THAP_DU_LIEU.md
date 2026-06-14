@@ -19,15 +19,41 @@ Trang đầu chứa các kỳ gần nhất. Trang cũ được tải qua AjaxPro
 `ServerSideDrawResult`. Mã nguồn tự đọc khóa động và tổng số dòng từ HTML.
 Trang chi tiết được dùng cho giải thưởng và liên kết biên bản PDF khi có.
 
-## Nguồn hỗ trợ lịch sử
+## Nguồn dự phòng và hỗ trợ lịch sử
+
+GitHub Actions hiện có thể nhận HTTP 403 từ Vietlott do chính sách Cloudflare áp
+dụng theo IP trung tâm dữ liệu. Khi cả trang HTML và AjaxPro chính thức đều thất
+bại, workflow đọc các trang kết quả công khai không có query string của
+[Xổ Số Minh Ngọc](https://xosominhngoc.net.vn/kqxs-vietlott).
+
+Nguồn dự phòng hỗ trợ Mega 6/45, Power 6/55, Lotto 5/35, Max 3D, Max 3D Pro,
+Keno và Bingo18. Parser yêu cầu đúng mã kỳ, ngày, số lượng kết quả, miền giá trị
+và cấu trúc giải. Chỉ cần một điều kiện không đúng thì toàn bộ trang của sản phẩm
+bị từ chối.
+
+Bản ghi lấy từ nguồn dự phòng có
+
+- `data_source=xosominhngoc_net_vn`
+- `official_verification_status=pending`
+- `secondary_source_url` trỏ tới trang đã đọc
+- `prize_status=secondary_complete` nếu giải thưởng lấy từ nguồn dự phòng
+
+Trạng thái `secondary_complete` cố ý không phải trạng thái kết thúc. Khi nguồn
+Vietlott truy cập lại được, collector tải trang chi tiết chính thức, thay thông
+tin giải thưởng và xóa nhãn chờ đối chiếu. Keno và Bingo18 dùng bảng luật thưởng
+riêng nên giữ `prize_status=rules_available`.
+
+Tệp `robots.txt` của nguồn dự phòng cho phép các đường dẫn không có query string.
+Workflow chỉ đọc một trang gần nhất cho mỗi sản phẩm, có rate limit, retry,
+backoff và nhận diện lỗi cấu trúc.
 
 Giao diện chính thức hiện không phân trang toàn bộ lịch sử Keno. Việc xây dựng
 lịch sử đầu tiên đã dùng thêm nguồn công khai theo ngày từ `xoso.com.vn`. Các
 khoảng trống còn lại chỉ được điền khi `ketquaday.vn` và `onbit.vn` cùng khớp
 ngày quay và đủ 20 số.
 
-Các nguồn phụ chỉ dùng cho lịch sử cũ và lưu dấu nguồn trong `attributes_json`.
-Workflow hằng ngày chỉ truy cập Vietlott.
+Các nguồn phụ luôn lưu dấu nguồn trong `attributes_json`. Nguồn chính thức vẫn
+có quyền ưu tiên cao nhất khi đối chiếu.
 
 Quy tắc đối chiếu Keno
 
@@ -88,6 +114,7 @@ Kiểm tra tự động gồm
 - một số nguồn phụ thiếu ngày hoặc thiếu từng mã kỳ
 - hai nguồn từng mâu thuẫn tại một số điểm và không được dùng nếu chưa có nguồn thứ ba
 - trang có thể trả HTTP 429, 5xx hoặc nội dung chưa hoàn thiện
+- Vietlott có thể trả HTTP 403 cho IP của GitHub Actions
 - kết quả từng được công bố nhưng sau đó không được xác nhận
 
 Các lỗi mạng được retry với backoff và jitter. Lỗi parser làm workflow báo lỗi,

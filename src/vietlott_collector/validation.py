@@ -18,6 +18,12 @@ def validate_draw(record: DrawRecord, spec: ProductSpec) -> list[str]:
     warnings: list[str] = []
     if not record.draw_id.isdigit():
         warnings.append("draw_id is not numeric")
+    else:
+        expected_width = 7 if spec.slug in {"keno", "bingo18"} else 5
+        if len(record.draw_id) != expected_width:
+            warnings.append(
+                f"draw_id expected {expected_width} digits, got {len(record.draw_id)}"
+            )
 
     if spec.parser_kind in {ParserKind.MATRIX, ParserKind.KENO}:
         numbers = _integers(record.result.get("numbers"))

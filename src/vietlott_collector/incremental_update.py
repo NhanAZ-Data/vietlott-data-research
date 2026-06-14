@@ -10,9 +10,9 @@ from .audit import AuditReport
 from .config import PRODUCT_SPECS, ProductSpec, resolve_products
 from .exclusions import apply_known_exclusions
 from .http import HttpClient, HttpSettings
-from .models import utc_now_iso
+from .models import DrawRecord, PrizeRecord, canonical_json, utc_now_iso
 from .pipeline import Collector, CollectorOptions
-from .sources import OfficialVietlottSource
+from .sources import OfficialVietlottSource, SecondaryBatch, SecondaryResultSource
 from .state import StateStore
 from .storage import SqliteDatasetStore
 
@@ -38,6 +38,7 @@ def run_update(
     before_draws, before_prizes = store.counts()
     source_errors = 0
     reconciliation: dict[str, object] = {}
+    fallback_reports: dict[str, object] = {}
 
     settings = HttpSettings(
         timeout_seconds=timeout,
@@ -53,6 +54,7 @@ def run_update(
     try:
         with HttpClient(settings) as client:
             source = OfficialVietlottSource(client)
+            secondary_source = SecondaryResultSource(client)
             state_store = StateStore(output_dir / ".collector-state.json")
             summaries = []
             for include_prizes, selected in (
@@ -72,9 +74,32 @@ def run_update(
                     ),
                 )
                 summaries.extend(collector.collect(selected))
-            source_errors += sum(summary.errors for summary in summaries)
+            failed_products = {
+                summary.product for summary in summaries if summary.errors > 0
+            }
 
             for spec in specs:
+                if spec.slug not in failed_products:
+                    continue
+                try:
+                    batch = secondary_source.fetch(spec)
+                    fallback_reports[spec.slug] = _store_secondary_batch(
+                        store,
+                        batch,
+                    )
+                except Exception as exc:
+                    source_errors += 1
+                    fallback_reports[spec.slug] = {"error": str(exc)}
+                    LOGGER.exception("Secondary collection failed for %s", spec.slug)
+
+            for spec in specs:
+                if spec.slug in failed_products:
+                    if "error" not in fallback_reports.get(spec.slug, {}):
+                        reconciliation[spec.slug] = {
+                            "skipped": "official source unavailable",
+                            "fallback_source": fallback_reports[spec.slug],
+                        }
+                    continue
                 try:
                     reconciliation[spec.slug] = _reconcile_recent(
                         source,
@@ -104,6 +129,7 @@ def run_update(
             "prize_rows_after": after_prizes,
             "new_prize_rows": after_prizes - before_prizes,
             "source_errors": source_errors,
+            "official_source_errors": sum(summary.errors for summary in summaries),
             "summaries": [
                 {
                     "product": summary.product,
@@ -115,6 +141,7 @@ def run_update(
                 }
                 for summary in summaries
             ],
+            "secondary_fallback": fallback_reports,
             "recent_reconciliation": reconciliation,
             "known_exclusions": exclusions,
             "audit": audit.as_dict(),
@@ -127,6 +154,66 @@ def run_update(
         return report
     finally:
         store.close()
+
+
+def _store_secondary_batch(
+    store: SqliteDatasetStore,
+    batch: SecondaryBatch,
+) -> dict[str, object]:
+    if not batch.draws:
+        raise RuntimeError("Secondary source returned no draw records")
+
+    existing_ids: dict[str, set[str]] = {}
+    incomplete: dict[tuple[str, str], DrawRecord] = {}
+    for product in {record.product for record in batch.draws}:
+        existing_ids[product] = store.existing_draw_ids(product)
+        incomplete.update(
+            {
+                record.key: record
+                for record in store.incomplete_draw_records(product)
+            }
+        )
+
+    prizes_by_draw: dict[tuple[str, str], list[PrizeRecord]] = {}
+    for prize in batch.prizes:
+        prizes_by_draw.setdefault((prize.product, prize.draw_id), []).append(prize)
+
+    draw_updates: list[DrawRecord] = []
+    prize_updates: list[PrizeRecord] = []
+    inserted = 0
+    prize_supplements = 0
+    for record in batch.draws:
+        draw_prizes = prizes_by_draw.get(record.key, [])
+        if record.draw_id not in existing_ids[record.product]:
+            draw_updates.append(record)
+            prize_updates.extend(draw_prizes)
+            inserted += 1
+            continue
+
+        old = incomplete.get(record.key)
+        if old is None or not draw_prizes:
+            continue
+        if old.draw_date != record.draw_date or canonical_json(old.result) != canonical_json(
+            record.result
+        ):
+            raise RuntimeError(
+                f"Secondary result conflicts with stored draw {record.product} "
+                f"{record.draw_id}"
+            )
+        old.prize_status = "secondary_complete"
+        old.attributes["secondary_prize_source_url"] = batch.source_url
+        draw_updates.append(old)
+        prize_updates.extend(draw_prizes)
+        prize_supplements += 1
+
+    store.upsert(draw_updates, prize_updates)
+    return {
+        "source_url": batch.source_url,
+        "draws_seen": len(batch.draws),
+        "prizes_seen": len(batch.prizes),
+        "draws_inserted": inserted,
+        "prize_supplements": prize_supplements,
+    }
 
 
 def _reconcile_recent(

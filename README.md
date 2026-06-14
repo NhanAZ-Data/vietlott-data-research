@@ -7,6 +7,10 @@ Dự án ưu tiên nguồn công khai chính thức, lưu cả lịch sử đã 
 kỳ mới bằng GitHub Actions. Mục tiêu là tạo một tập dữ liệu có nguồn gốc rõ ràng,
 có thể tái lập và đủ thuận tiện cho phân tích bằng Python, R hoặc công cụ bảng tính.
 
+Khi máy chạy GitHub bị Vietlott chặn truy cập, workflow dùng trang kết quả công
+khai của Xổ Số Minh Ngọc làm nguồn dự phòng. Các dòng này được gắn nhãn chờ
+đối chiếu và sẽ được thay bằng nguồn chính thức khi Vietlott truy cập được.
+
 ## Phạm vi dữ liệu
 
 - Mega 6/45
@@ -18,7 +22,7 @@ có thể tái lập và đủ thuận tiện cho phân tích bằng Python, R h
 - Keno
 - Bingo18
 
-Bản snapshot kiểm toán ban đầu có 379.306 bản ghi kỳ quay và tiếp tục tăng qua
+Bản snapshot kiểm toán hiện có 379.313 bản ghi kỳ quay và tiếp tục tăng qua
 workflow. Keno có dữ liệu từ mã `0000001` và 75 mã kỳ đã được nhiều nguồn đối
 chiếu là không phát hành. Các kỳ bị thông báo không xác nhận được giữ lại với
 `draw_status=not_confirmed` để bảo toàn dấu vết, nhưng phải loại khỏi mẫu phân
@@ -79,6 +83,7 @@ Cách này xử lý được các trường hợp
 - workflow bị GitHub trì hoãn
 - mạng lỗi tạm thời
 - nguồn sửa kết quả gần nhất
+- nguồn chính thức tạm chặn IP của GitHub
 
 Nếu không có dữ liệu mới thì workflow không tạo commit. Khi một lần chạy bị lỡ,
 lần sau tiếp tục đọc nhiều trang cho đến khi gặp vùng dữ liệu đã có.

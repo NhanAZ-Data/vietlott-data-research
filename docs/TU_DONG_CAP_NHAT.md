@@ -48,6 +48,7 @@ Lịch workflow chỉ là lịch thăm dò. Chương trình không tạo bản g
 - Nếu sản phẩm dừng lâu dài, workflow không tạo thay đổi dữ liệu
 - Nếu mạng lỗi, HTTP client retry và tôn trọng `Retry-After`
 - Nếu trang HTML bị Cloudflare chặn, chương trình dùng endpoint AjaxPro chính thức
+- Nếu cả HTML và AjaxPro bị chặn, chương trình dùng nguồn dự phòng đã kiểm tra cấu trúc
 - Nếu GitHub trì hoãn một lượt cron, lượt sau vẫn bắt kịp
 - Nếu nguồn sửa kỳ gần đây, bước reconciliation cập nhật bản ghi
 - Nếu HTML thay đổi bất thường, parser dừng thay vì đoán
@@ -63,17 +64,21 @@ dữ liệu ngừng cập nhật bất thường.
 2. Ghép phân vùng trong `datasets` thành CSV làm việc.
 3. Nhập CSV vào SQLite.
 4. Đọc trang chính thức và trang tiếp theo nếu có kỳ mới.
-5. Đối chiếu lại hai trang gần nhất.
-6. Áp dụng danh sách kỳ không được xác nhận.
-7. Kiểm tra trùng, thiếu, JSON, khóa ngoại và kích thước tệp.
-8. Chia lại dữ liệu theo sản phẩm và tháng.
-9. Commit và push chỉ khi `datasets` thay đổi.
+5. Chuyển sang nguồn dự phòng nếu nguồn chính thức không truy cập được.
+6. Đối chiếu lại hai trang gần nhất khi nguồn chính thức hoạt động.
+7. Áp dụng danh sách kỳ không được xác nhận.
+8. Kiểm tra trùng, thiếu, JSON, khóa ngoại và kích thước tệp.
+9. Chia lại dữ liệu theo sản phẩm và tháng.
+10. Commit và push chỉ khi `datasets` thay đổi.
 
 Hai workflow dùng cùng một concurrency group nên không ghi đè nhau. Quyền
 `GITHUB_TOKEN` chỉ cấp `contents: write`.
 
 Nếu nguồn lỗi nhưng một sản phẩm khác đã cập nhật hợp lệ, workflow vẫn kiểm tra và
 lưu phần hợp lệ trước khi báo đỏ. Cách này vừa không mất dữ liệu vừa không che lỗi.
+
+Lỗi nguồn Vietlott được ghi riêng trong `official_source_errors`. Workflow chỉ
+báo đỏ khi cả Vietlott và nguồn dự phòng đều không cung cấp được một trang hợp lệ.
 
 Commit do `GITHUB_TOKEN` tạo không kích hoạt workflow khác. Vì vậy mỗi workflow
 cập nhật tự kiểm tra dữ liệu trước khi push. Website tĩnh trong tương lai nên được
