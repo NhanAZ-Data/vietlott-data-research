@@ -205,11 +205,16 @@ file để giữ lại dấu vết thay đổi.
     `tests/test_fairness_audit.py`, `tests/test_documentation.py` và `tests/test_static_site.py`.
     Chờ CI.
 
-- [ ] `AUDIT-003` Công bố ma trận phụ thuộc giữa các phép kiểm.
+- [x] `AUDIT-003` Công bố ma trận phụ thuộc giữa các phép kiểm.
   - Lý do
     - Chi-square và G-test thường trả lời câu hỏi gần giống nhau
     - Nhiều phép thử dùng chung dữ liệu và không độc lập
   - Xem xét hiệu chỉnh theo họ phép thử và toàn hệ thống
+  - Hoàn thành ngày 15/06/2026 trong commit d21205769c1167cd4597bf52dfc4b4210da2994b.
+    Bằng chứng `src/vietlott_analytics/fairness.py`,
+    `docs/AUDIT_TEST_DEPENDENCIES.md`, `site/data/audit-summary.json`,
+    `site/data/analysis-export.json`, `tests/test_fairness_audit.py`,
+    `tests/test_documentation.py` và `tests/test_static_site.py`.
 
 ### P1.2 Tái kiểm tra tín hiệu Max 3D
 
