@@ -19,12 +19,12 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert 'id="phan-tich"' in index
     assert 'id="du-doan"' in index
     assert 'id="kiem-dinh"' in index
-    assert "assets/app.js?v=20260615-11" in index
+    assert "assets/app.js?v=20260615-12" in index
     assert "archive-summary-heading" in index
     assert "Sổ dự đoán toàn hệ thống" in index
     assert "assets/docs.js?v=20260615-1" in data_page
     for page in (index, method_page, data_page):
-        assert "assets/styles.css?v=20260615-12" in page
+        assert "assets/styles.css?v=20260615-13" in page
         assert "assets/favicon.svg?v=20260614-9" in page
         assert "fonts.googleapis.com/css2?family=Noto+Serif" in page
         assert "cdn-uicons.flaticon.com/3.0.0" in page
@@ -53,6 +53,11 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "renderAuditVisualLog" in app_script
     assert "renderAuditThresholdSensitivity" in app_script
     assert "threshold_sensitivity" in app_script
+    assert "renderAuditDependencyMatrix" in app_script
+    assert "Ma trận phụ thuộc" in app_script
+    assert "q theo họ" in app_script
+    assert "audit-dependency-panel" in styles
+    assert "audit-dependency-grid" in styles
     assert "renderAuditPositionResiduals" in app_script
     assert "Ô nào đóng góp nhiều vào độ lệch tổng?" in app_script
     assert "threshold-sensitivity-grid" in styles
@@ -148,6 +153,9 @@ def test_generated_site_data_matches_manifest() -> None:
     assert len(predictions["ledger_integrity"]["root_hash"]) == 64
     assert manifest["fairness_audit"]["test_count"] == audit_summary["summary"]["test_count"]
     assert audit_summary["suite_version"] == "2.0.0"
+    assert audit_summary["dependency_families"]
+    assert audit_summary["dependency_matrix"]["pairs"]
+    assert audit_summary["multiple_testing"]["diagnostic_family_q"] == "q_value_dependency_family_bh"
     assert audit_log
     assert analysis_export["export_type"] == "vietlott_research_analysis"
     assert analysis_export["manifest"] == manifest
@@ -170,6 +178,9 @@ def test_generated_site_data_matches_manifest() -> None:
         len(rows) for rows in predictions["latest"].values()
     ) == predictions["embedded_pending_count"]
     assert analysis_export["methodology"]["versions"] == manifest["methodology_versions"]
+    assert analysis_export["methodology"]["fairness_audit"]["dependency_matrix"][
+        "pair_definition_count"
+    ] == audit_summary["dependency_matrix"]["pair_definition_count"]
     assert analysis_export["raw_data_catalog"]
     for entry in analysis_export["raw_data_catalog"]:
         assert len(entry["sha256"]) == 64
@@ -189,5 +200,6 @@ def test_generated_site_data_matches_manifest() -> None:
             == product["prize_coverage_rate"]
         )
         assert report["audit"]["suite_version"] == "2.0.0"
+        assert report["audit"]["dependency_matrix"]["pairs"]
         assert report["backtest"]["recent_model"]["strategy"] == "recent_frequency"
         assert "recent_comparison" in report["backtest"]

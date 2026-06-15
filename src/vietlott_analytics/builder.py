@@ -228,6 +228,9 @@ def _build_analysis_export(
             "fairness_audit": {
                 "suite_version": audit_summary["suite_version"],
                 "multiple_testing": "Benjamini-Hochberg trong bộ kiểm định được công bố",
+                "multiple_testing_details": audit_summary.get("multiple_testing", {}),
+                "dependency_families": audit_summary.get("dependency_families", []),
+                "dependency_matrix": audit_summary.get("dependency_matrix", {}),
                 "effect_thresholds": audit_summary.get("effect_thresholds", []),
                 "threshold_sensitivity": audit_summary.get("threshold_sensitivity", {}),
                 "interpretation": (

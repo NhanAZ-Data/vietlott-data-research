@@ -43,6 +43,177 @@ FAMILY_DESCRIPTIONS = [
     },
 ]
 
+DEPENDENCY_FAMILY_DESCRIPTIONS = [
+    {
+        "id": "number_frequency_history",
+        "label": "Tần suất số theo lịch sử",
+        "plain_language": (
+            "Các phép kiểm cùng đọc lịch sử xuất hiện của từng số, từ tổng tần suất "
+            "đến tháng quay và khoảng vắng hiện tại."
+        ),
+        "correction_scope": "number-set marginal counts, calendar strata and gap history",
+    },
+    {
+        "id": "number_ordered_summary",
+        "label": "Chuỗi tổng bộ số",
+        "plain_language": (
+            "Các phép kiểm dùng cùng chuỗi tổng của từng kỳ để đọc nhịp cao-thấp, "
+            "tự tương quan và đổi chế độ theo thời gian."
+        ),
+        "correction_scope": "draw-order sum statistics for number-set products",
+    },
+    {
+        "id": "number_within_draw_structure",
+        "label": "Cấu trúc trong cùng kỳ",
+        "plain_language": (
+            "Các phép kiểm dùng đặc trưng sinh ra từ cùng một bộ số trong một kỳ, "
+            "như cặp đồng xuất hiện hoặc số lượng số lẻ."
+        ),
+        "correction_scope": "within-draw combination structure for number-set products",
+    },
+    {
+        "id": "digit_frequency_distribution",
+        "label": "Tần suất chữ số",
+        "plain_language": (
+            "Các phép kiểm cùng đọc số lần xuất hiện chữ số, có thể gộp toàn chuỗi, "
+            "tách theo vị trí hoặc tách theo tháng."
+        ),
+        "correction_scope": "digit counts, position counts and calendar strata",
+    },
+    {
+        "id": "digit_ordered_sequence",
+        "label": "Chuỗi kết quả theo thời gian",
+        "plain_language": (
+            "Các phép kiểm dùng thứ tự kỳ quay của chuỗi chữ số để đọc nhịp, tự tương "
+            "quan hoặc đổi chế độ."
+        ),
+        "correction_scope": "draw-order value and digit-sum statistics",
+    },
+    {
+        "id": "digit_sum_structure",
+        "label": "Tổng chữ số trong kết quả",
+        "plain_language": "Kiểm tra phân bố tổng chữ số của từng kết quả.",
+        "correction_scope": "within-outcome digit sums",
+    },
+    {
+        "id": "digit_repeat_structure",
+        "label": "Lặp chuỗi kết quả",
+        "plain_language": "Kiểm tra số cặp kết quả trùng nhau trong không gian hữu hạn.",
+        "correction_scope": "duplicate outcome pairs",
+    },
+]
+
+TEST_DEPENDENCY_PROFILES = {
+    "number_marginal_chi_square": {
+        "dependency_family": "number_frequency_history",
+        "dependency_cluster": "number_marginal_uniformity",
+        "dependency_tags": ["number_set", "marginal_counts", "pooled_counts"],
+        "data_view": "one count per drawn number across the full confirmed history",
+    },
+    "number_marginal_g_test": {
+        "dependency_family": "number_frequency_history",
+        "dependency_cluster": "number_marginal_uniformity",
+        "dependency_tags": ["number_set", "marginal_counts", "pooled_counts"],
+        "data_view": "one count per drawn number across the full confirmed history",
+    },
+    "number_sum_runs": {
+        "dependency_family": "number_ordered_summary",
+        "dependency_cluster": "number_sum_order",
+        "dependency_tags": ["number_set", "ordered_draws", "draw_sum"],
+        "data_view": "ordered series of draw sums",
+    },
+    "number_sum_lag1_autocorrelation": {
+        "dependency_family": "number_ordered_summary",
+        "dependency_cluster": "number_sum_order",
+        "dependency_tags": ["number_set", "ordered_draws", "draw_sum"],
+        "data_view": "ordered series of draw sums",
+    },
+    "number_sum_split_half_change": {
+        "dependency_family": "number_ordered_summary",
+        "dependency_cluster": "number_sum_change",
+        "dependency_tags": ["number_set", "ordered_draws", "draw_sum", "change_point"],
+        "data_view": "first-half and second-half draw sums",
+    },
+    "number_month_heterogeneity": {
+        "dependency_family": "number_frequency_history",
+        "dependency_cluster": "number_calendar_counts",
+        "dependency_tags": ["number_set", "marginal_counts", "calendar_strata"],
+        "data_view": "drawn number counts stratified by calendar month",
+    },
+    "number_current_gap_geometric": {
+        "dependency_family": "number_frequency_history",
+        "dependency_cluster": "number_current_gap",
+        "dependency_tags": ["number_set", "marginal_history", "tail_gap"],
+        "data_view": "current waiting time for each number",
+    },
+    "number_pair_co_occurrence": {
+        "dependency_family": "number_within_draw_structure",
+        "dependency_cluster": "number_pair_structure",
+        "dependency_tags": ["number_set", "within_draw", "pair_counts"],
+        "data_view": "pairs formed inside each draw",
+    },
+    "number_odd_count_hypergeometric": {
+        "dependency_family": "number_within_draw_structure",
+        "dependency_cluster": "number_parity_structure",
+        "dependency_tags": ["number_set", "within_draw", "parity_counts"],
+        "data_view": "odd-number count inside each draw",
+    },
+    "digit_marginal_chi_square": {
+        "dependency_family": "digit_frequency_distribution",
+        "dependency_cluster": "digit_marginal_uniformity",
+        "dependency_tags": ["digit_sequence", "digit_counts", "pooled_digits"],
+        "data_view": "digit counts pooled across positions",
+    },
+    "digit_marginal_g_test": {
+        "dependency_family": "digit_frequency_distribution",
+        "dependency_cluster": "digit_marginal_uniformity",
+        "dependency_tags": ["digit_sequence", "digit_counts", "pooled_digits"],
+        "data_view": "digit counts pooled across positions",
+    },
+    "digit_position_chi_square": {
+        "dependency_family": "digit_frequency_distribution",
+        "dependency_cluster": "digit_position_uniformity",
+        "dependency_tags": ["digit_sequence", "digit_counts", "position_counts"],
+        "data_view": "digit counts split by position",
+    },
+    "digit_value_runs": {
+        "dependency_family": "digit_ordered_sequence",
+        "dependency_cluster": "digit_value_order",
+        "dependency_tags": ["digit_sequence", "ordered_draws", "numeric_value"],
+        "data_view": "ordered numeric value of each outcome",
+    },
+    "digit_value_lag1_autocorrelation": {
+        "dependency_family": "digit_ordered_sequence",
+        "dependency_cluster": "digit_value_order",
+        "dependency_tags": ["digit_sequence", "ordered_draws", "numeric_value"],
+        "data_view": "ordered numeric value of each outcome",
+    },
+    "digit_sum_split_half_change": {
+        "dependency_family": "digit_ordered_sequence",
+        "dependency_cluster": "digit_sum_change",
+        "dependency_tags": ["digit_sequence", "ordered_draws", "digit_sum", "change_point"],
+        "data_view": "first-half and second-half digit sums",
+    },
+    "digit_month_heterogeneity": {
+        "dependency_family": "digit_frequency_distribution",
+        "dependency_cluster": "digit_calendar_counts",
+        "dependency_tags": ["digit_sequence", "digit_counts", "calendar_strata"],
+        "data_view": "digit counts stratified by calendar month",
+    },
+    "digit_sum_distribution": {
+        "dependency_family": "digit_sum_structure",
+        "dependency_cluster": "digit_sum_distribution",
+        "dependency_tags": ["digit_sequence", "digit_sum", "within_outcome"],
+        "data_view": "digit-sum distribution for each outcome",
+    },
+    "digit_repeat_poisson": {
+        "dependency_family": "digit_repeat_structure",
+        "dependency_cluster": "digit_duplicate_pairs",
+        "dependency_tags": ["digit_sequence", "outcome_identity", "repeat_pairs"],
+        "data_view": "duplicate outcome pairs across the confirmed history",
+    },
+}
+
 EFFECT_THRESHOLD_SENSITIVITY_MULTIPLIERS = [0.5, 1.0, 1.5, 2.0]
 
 EFFECT_THRESHOLD_REGISTRY = [
@@ -285,6 +456,7 @@ def build_product_audit(dataset: ProductDataset) -> dict[str, Any]:
         else _digit_sequence_tests(dataset)
     )
     _apply_local_correction(tests)
+    _apply_dependency_family_correction(tests)
     _refresh_test_statuses(tests)
     return _audit_payload(dataset, tests)
 
@@ -308,6 +480,7 @@ def finalize_audits(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
         audit["status_counts"] = dict(Counter(test["status"] for test in audit["tests"]))
         audit["strongest_signal"] = _strongest_signal(audit["tests"])
         audit["conclusion"] = _audit_conclusion(audit["tests"])
+        audit["dependency_matrix"] = _dependency_matrix(audit["tests"])
 
     return {
         "schema_version": 1,
@@ -318,6 +491,9 @@ def finalize_audits(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
             "Đây không phải kết luận pháp lý hay kiểm toán vận hành."
         ),
         "families": FAMILY_DESCRIPTIONS,
+        "dependency_families": _dependency_family_metadata(),
+        "dependency_matrix": _global_dependency_matrix(product_reports),
+        "multiple_testing": _multiple_testing_metadata(),
         "effect_thresholds": _effect_threshold_metadata(),
         "threshold_sensitivity": _effect_threshold_sensitivity(product_reports),
         "deferred_methods": DEFERRED_METHODS,
@@ -357,11 +533,15 @@ def audit_log_events(product_reports: list[dict[str, Any]]) -> Iterator[dict[str
                 "audit_interval_draws": audit["audit_interval_draws"],
                 "test_id": test["id"],
                 "family": test["family"],
+                "dependency_family": test.get("dependency_family"),
+                "dependency_family_label": test.get("dependency_family_label"),
+                "dependency_cluster": test.get("dependency_cluster"),
                 "algorithm": test["algorithm"],
                 "status": test["status"],
                 "statistic": test.get("statistic"),
                 "p_value": test.get("p_value"),
                 "q_value_bh": test.get("q_value_bh"),
+                "q_value_dependency_family_bh": test.get("q_value_dependency_family_bh"),
                 "q_value_global_bh": test.get("q_value_global_bh"),
                 "effect_size": test.get("effect_size"),
                 "practical_effect_threshold": test.get("practical_effect_threshold"),
@@ -404,6 +584,9 @@ def _audit_payload(dataset: ProductDataset, tests: list[dict[str, Any]]) -> dict
         "audit_interval_draws": interval,
         "next_recommended_audit_after_draws": len(dataset.observations) + interval,
         "families": FAMILY_DESCRIPTIONS,
+        "dependency_families": _dependency_family_metadata(),
+        "dependency_matrix": _dependency_matrix(tests),
+        "multiple_testing": _multiple_testing_metadata(),
         "effect_thresholds": _effect_threshold_metadata(),
         "status_counts": dict(Counter(test["status"] for test in tests)),
         "strongest_signal": _strongest_signal(tests),
@@ -1113,9 +1296,11 @@ def _test_result(
     degrees_of_freedom: int | None = None,
     parameters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    dependency = _test_dependency_metadata(test_id)
     return {
         "id": test_id,
         "family": family,
+        **dependency,
         "algorithm": algorithm,
         "label": label,
         "plain_language": plain_language,
@@ -1124,6 +1309,7 @@ def _test_result(
         "degrees_of_freedom": degrees_of_freedom,
         "p_value": _round(max(0.0, min(1.0, p_value)), 8),
         "q_value_bh": None,
+        "q_value_dependency_family_bh": None,
         "q_value_global_bh": None,
         "effect_size_name": effect_size_name,
         "effect_size": _round(effect_size),
@@ -1148,9 +1334,11 @@ def _skipped_test(
     sample_size: int,
     parameters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    dependency = _test_dependency_metadata(test_id)
     return {
         "id": test_id,
         "family": family,
+        **dependency,
         "algorithm": algorithm,
         "label": label,
         "plain_language": plain_language,
@@ -1159,6 +1347,7 @@ def _skipped_test(
         "degrees_of_freedom": None,
         "p_value": None,
         "q_value_bh": None,
+        "q_value_dependency_family_bh": None,
         "q_value_global_bh": None,
         "effect_size_name": None,
         "effect_size": None,
@@ -1170,6 +1359,62 @@ def _skipped_test(
         "statistically_notable": False,
         "practically_large": False,
         "interpretation": "Tạm hoãn để giữ workflow tự động đủ nhẹ và có thể tái lập hằng ngày.",
+    }
+
+
+def _test_dependency_metadata(test_id: str) -> dict[str, Any]:
+    profile = TEST_DEPENDENCY_PROFILES.get(test_id)
+    if profile is None:
+        return {
+            "dependency_family": "unclassified",
+            "dependency_family_label": "Chưa phân nhóm",
+            "dependency_cluster": "unclassified",
+            "dependency_tags": [],
+            "dependency_data_view": "not classified",
+        }
+    dependency_family = str(profile["dependency_family"])
+    return {
+        "dependency_family": dependency_family,
+        "dependency_family_label": _dependency_family_label(dependency_family),
+        "dependency_cluster": str(profile["dependency_cluster"]),
+        "dependency_tags": list(profile["dependency_tags"]),
+        "dependency_data_view": str(profile["data_view"]),
+    }
+
+
+def _dependency_family_label(dependency_family: str) -> str:
+    for entry in DEPENDENCY_FAMILY_DESCRIPTIONS:
+        if entry["id"] == dependency_family:
+            return str(entry["label"])
+    return dependency_family
+
+
+def _dependency_family_metadata() -> list[dict[str, Any]]:
+    test_ids_by_family: dict[str, list[str]] = {
+        str(entry["id"]): [] for entry in DEPENDENCY_FAMILY_DESCRIPTIONS
+    }
+    for test_id, profile in TEST_DEPENDENCY_PROFILES.items():
+        test_ids_by_family.setdefault(str(profile["dependency_family"]), []).append(test_id)
+    return [
+        {
+            **entry,
+            "test_ids": sorted(test_ids_by_family.get(str(entry["id"]), [])),
+        }
+        for entry in DEPENDENCY_FAMILY_DESCRIPTIONS
+    ]
+
+
+def _multiple_testing_metadata() -> dict[str, Any]:
+    return {
+        "method": "benjamini_hochberg",
+        "primary_decision_q": "q_value_global_bh",
+        "fallback_decision_q": "q_value_bh before global finalization",
+        "diagnostic_family_q": "q_value_dependency_family_bh",
+        "alpha": 0.05,
+        "plain_language": (
+            "Trạng thái thống kê ưu tiên q toàn hệ thống. q theo họ phụ thuộc chỉ "
+            "giúp đọc các phép kiểm dùng chung lát dữ liệu hoặc cùng câu hỏi."
+        ),
     }
 
 
@@ -1262,6 +1507,127 @@ def _effect_sensitivity_row(
     }
 
 
+def _dependency_matrix(tests: list[dict[str, Any]]) -> dict[str, Any]:
+    pairs = [
+        pair
+        for left, right in combinations(sorted(tests, key=lambda test: test["id"]), 2)
+        if (pair := _dependency_pair(left, right)) is not None
+    ]
+    counts = Counter(pair["dependency_strength"] for pair in pairs)
+    return {
+        "scope": "single_product",
+        "test_count": len(tests),
+        "pair_count": len(pairs),
+        "counts": {
+            "high": counts["high"],
+            "medium": counts["medium"],
+            "low": counts["low"],
+        },
+        "pairs": pairs,
+        "note": (
+            "Ma trận là bản đồ phụ thuộc phương pháp, không phải ma trận tương quan "
+            "ước lượng từ dữ liệu. Cặp high thường dùng cùng dữ liệu và cùng câu hỏi; "
+            "medium dùng chung họ phụ thuộc; low chỉ chia sẻ miền sản phẩm."
+        ),
+    }
+
+
+def _global_dependency_matrix(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
+    pair_counts: Counter[tuple[str, str, str, str]] = Counter()
+    examples: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for report in product_reports:
+        audit = report.get("audit", {})
+        matrix = audit.get("dependency_matrix")
+        if not isinstance(matrix, dict):
+            matrix = _dependency_matrix(audit.get("tests", []))
+        for pair in matrix.get("pairs", []):
+            key = (
+                str(pair["left_id"]),
+                str(pair["right_id"]),
+                str(pair["dependency_strength"]),
+                str(pair["relationship"]),
+            )
+            pair_counts[key] += 1
+            examples.setdefault(key, pair)
+    pairs = [
+        {
+            **examples[key],
+            "product_count": product_count,
+        }
+        for key, product_count in sorted(pair_counts.items())
+    ]
+    counts = Counter(
+        pair["dependency_strength"]
+        for pair in pairs
+        for _ in range(int(pair["product_count"]))
+    )
+    return {
+        "scope": "all_products_by_test_definition",
+        "pair_definition_count": len(pairs),
+        "pair_occurrence_count": sum(pair_counts.values()),
+        "counts": {
+            "high": counts["high"],
+            "medium": counts["medium"],
+            "low": counts["low"],
+        },
+        "pairs": pairs,
+        "note": (
+            "Bản toàn hệ thống gom các quan hệ xuất hiện trong từng sản phẩm và đếm "
+            "số sản phẩm có cùng cặp phép kiểm."
+        ),
+    }
+
+
+def _dependency_pair(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any] | None:
+    left_tags = set(left.get("dependency_tags") or [])
+    right_tags = set(right.get("dependency_tags") or [])
+    shared_tags = sorted(left_tags & right_tags)
+    if not shared_tags:
+        return None
+
+    same_cluster = (
+        left.get("dependency_cluster")
+        and left.get("dependency_cluster") == right.get("dependency_cluster")
+    )
+    same_family = (
+        left.get("dependency_family")
+        and left.get("dependency_family") == right.get("dependency_family")
+    )
+    if same_cluster:
+        strength = "high"
+        relationship = "same_question"
+        rationale = (
+            "Hai phép kiểm dùng cùng lát dữ liệu và trả lời gần như cùng một câu hỏi, "
+            "nên không nên đọc như hai bằng chứng độc lập."
+        )
+    elif same_family:
+        strength = "medium"
+        relationship = "same_dependency_family"
+        rationale = (
+            "Hai phép kiểm dùng chung họ dữ liệu hoặc đặc trưng dẫn xuất, vì vậy kết "
+            "quả có thể cùng phản ánh một sai lệch nền."
+        )
+    elif {"number_set", "digit_sequence"} & set(shared_tags):
+        strength = "low"
+        relationship = "same_product_domain"
+        rationale = (
+            "Hai phép kiểm cùng thuộc một miền sản phẩm nhưng nhìn các đặc trưng khác nhau."
+        )
+    else:
+        return None
+
+    return {
+        "left_id": left["id"],
+        "left_label": left["label"],
+        "right_id": right["id"],
+        "right_label": right["label"],
+        "dependency_strength": strength,
+        "relationship": relationship,
+        "shared_tags": shared_tags,
+        "rationale": rationale,
+    }
+
+
 def _apply_local_correction(tests: list[dict[str, Any]]) -> None:
     indexed = [
         (index, float(test["p_value"]))
@@ -1271,6 +1637,20 @@ def _apply_local_correction(tests: list[dict[str, Any]]) -> None:
     q_values = _benjamini_hochberg([p_value for _, p_value in indexed])
     for (index, _), q_value in zip(indexed, q_values, strict=True):
         tests[index]["q_value_bh"] = _round(q_value, 8)
+
+
+def _apply_dependency_family_correction(tests: list[dict[str, Any]]) -> None:
+    indexes_by_family: dict[str, list[tuple[int, float]]] = {}
+    for index, test in enumerate(tests):
+        if not isinstance(test.get("p_value"), (int, float)):
+            continue
+        family = str(test.get("dependency_family") or "unclassified")
+        indexes_by_family.setdefault(family, []).append((index, float(test["p_value"])))
+
+    for indexed in indexes_by_family.values():
+        q_values = _benjamini_hochberg([p_value for _, p_value in indexed])
+        for (index, _), q_value in zip(indexed, q_values, strict=True):
+            tests[index]["q_value_dependency_family_bh"] = _round(q_value, 8)
 
 
 def _refresh_test_statuses(tests: list[dict[str, Any]]) -> None:
@@ -1355,7 +1735,10 @@ def _strongest_signal(tests: list[dict[str, Any]]) -> dict[str, Any] | None:
         "status": top["status"],
         "p_value": top.get("p_value"),
         "q_value_bh": top.get("q_value_bh"),
+        "q_value_dependency_family_bh": top.get("q_value_dependency_family_bh"),
         "q_value_global_bh": top.get("q_value_global_bh"),
+        "dependency_family": top.get("dependency_family"),
+        "dependency_family_label": top.get("dependency_family_label"),
         "effect_size": top.get("effect_size"),
         "practical_effect_threshold": top.get("practical_effect_threshold"),
         "statistically_notable": top.get("statistically_notable"),

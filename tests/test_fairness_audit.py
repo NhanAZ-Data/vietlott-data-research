@@ -49,6 +49,17 @@ def test_number_audit_contains_lightweight_fairness_tests() -> None:
     assert all("statistically_notable" in test for test in audit["tests"])
     assert all("practically_large" in test for test in audit["tests"])
     assert all("q_value_bh" in test for test in audit["tests"] if test["p_value"] is not None)
+    assert all("dependency_family" in test for test in audit["tests"])
+    assert all("dependency_family_label" in test for test in audit["tests"])
+    assert all(
+        "q_value_dependency_family_bh" in test
+        for test in audit["tests"]
+        if test["p_value"] is not None
+    )
+    assert audit["dependency_families"]
+    assert audit["multiple_testing"]["diagnostic_family_q"] == "q_value_dependency_family_bh"
+    assert audit["dependency_matrix"]["pairs"]
+    assert audit["dependency_matrix"]["counts"]["high"] >= 1
     registered_thresholds = {entry["id"] for entry in EFFECT_THRESHOLD_REGISTRY}
     active_tests = [test for test in audit["tests"] if test["status"] != "skipped"]
     assert all(test["effect_threshold_id"] in registered_thresholds for test in active_tests)
@@ -88,6 +99,9 @@ def test_finalize_audits_adds_global_correction_and_jsonl_events() -> None:
     assert summary["summary"]["product_count"] == 1
     assert summary["summary"]["test_count"] == len(report["audit"]["tests"])
     assert summary["effect_thresholds"]
+    assert summary["dependency_families"]
+    assert summary["dependency_matrix"]["pairs"]
+    assert summary["multiple_testing"]["primary_decision_q"] == "q_value_global_bh"
     assert summary["threshold_sensitivity"]["method"] == "threshold_multiplier_sweep"
     assert summary["threshold_sensitivity"]["multipliers"] == [0.5, 1.0, 1.5, 2.0]
     assert any(
@@ -96,6 +110,8 @@ def test_finalize_audits_adds_global_correction_and_jsonl_events() -> None:
     )
     assert events
     assert {event["event_type"] for event in events} == {"fairness_audit_test"}
+    assert all("dependency_family" in event for event in events)
+    assert any(event["q_value_dependency_family_bh"] is not None for event in events)
     assert all(
         "q_value_global_bh" in test
         for test in report["audit"]["tests"]

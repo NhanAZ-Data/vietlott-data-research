@@ -703,10 +703,49 @@ function renderFairnessAudit(audit) {
           <span>${escapeHtml(family.plain_language)}</span>
         </article>`).join("")}
     </div>
+    ${renderAuditDependencyMatrix(audit)}
     <p class="method-note">
       Nhóm thuật toán nặng như HMM, MCMC, TestU01 đầy đủ và deep learning chưa chạy tự động
       trong phiên bản này vì chi phí cao và dễ khó giải thích.
     </p>`;
+}
+
+function renderAuditDependencyMatrix(audit) {
+  const matrix = audit.dependency_matrix || {};
+  const pairs = matrix.pairs || [];
+  if (!pairs.length) return "";
+  const counts = matrix.counts || {};
+  const order = { high: 0, medium: 1, low: 2 };
+  const labels = { high: "Cao", medium: "Vừa", low: "Thấp" };
+  const highlightedPairs = [...pairs]
+    .sort((left, right) => (order[left.dependency_strength] ?? 9) - (order[right.dependency_strength] ?? 9))
+    .slice(0, 6);
+  return `
+    <section class="audit-dependency-panel" aria-labelledby="audit-dependency-title">
+      <div class="audit-dependency-heading">
+        <div>
+          <span>Ma trận phụ thuộc</span>
+          <strong id="audit-dependency-title">Phép kiểm nào đang nhìn cùng dữ liệu?</strong>
+        </div>
+        <p>${escapeHtml(matrix.note || "")}</p>
+      </div>
+      <div class="audit-dependency-grid">
+        ${["high", "medium", "low"].map((key) => `
+          <article class="${escapeHtml(key)}">
+            <span>${escapeHtml(labels[key])}</span>
+            <strong>${numberFormatter.format(counts[key] || 0)}</strong>
+          </article>`).join("")}
+      </div>
+      <div class="audit-dependency-pairs">
+        ${highlightedPairs.map((pair) => `
+          <article class="${escapeHtml(pair.dependency_strength)}">
+            <span>${escapeHtml(labels[pair.dependency_strength] || pair.dependency_strength)}</span>
+            <strong>${escapeHtml(pair.left_label)} · ${escapeHtml(pair.right_label)}</strong>
+            <p>${escapeHtml(pair.rationale)}</p>
+            <small>${escapeHtml((pair.shared_tags || []).join(", "))}</small>
+          </article>`).join("")}
+      </div>
+    </section>`;
 }
 
 function renderAuditPositionResiduals(audit) {
@@ -757,6 +796,9 @@ function renderAuditTestRow(test) {
   const qValue = test.q_value_global_bh ?? test.q_value_bh;
   const pValue = test.p_value == null ? "N/A" : formatPValue(test.p_value);
   const qDisplay = qValue == null ? "N/A" : formatPValue(qValue);
+  const familyQ = test.q_value_dependency_family_bh == null
+    ? "N/A"
+    : formatPValue(test.q_value_dependency_family_bh);
   const effect = test.effect_size == null ? "N/A" : formatDecimal(test.effect_size, 4);
   const threshold = test.practical_effect_threshold == null
     ? "Không áp dụng"
@@ -772,6 +814,8 @@ function renderAuditTestRow(test) {
         <div><dt>Trạng thái</dt><dd>${escapeHtml(auditStatusLabel(test.status))}</dd></div>
         <div><dt>p gốc</dt><dd>${escapeHtml(pValue)}</dd></div>
         <div><dt>q hiệu chỉnh</dt><dd>${escapeHtml(qDisplay)}</dd></div>
+        <div><dt>q theo họ</dt><dd>${escapeHtml(familyQ)}</dd></div>
+        <div><dt>Họ phụ thuộc</dt><dd>${escapeHtml(test.dependency_family_label || "Chưa phân nhóm")}</dd></div>
         <div><dt>Độ lớn</dt><dd>${escapeHtml(effect)}</dd></div>
         <div><dt>Ngưỡng thực dụng</dt><dd>${escapeHtml(threshold)}</dd></div>
       </dl>

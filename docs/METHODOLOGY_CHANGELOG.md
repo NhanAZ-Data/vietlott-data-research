@@ -13,6 +13,8 @@ backtest hoặc cách đọc website. Thay đổi giao diện thuần túy khôn
 - Công bố riêng p-value, q-value, độ lớn hiệu ứng và ngưỡng thực dụng
 - Khóa registry ngưỡng độ lớn hiệu ứng, đơn vị, phạm vi áp dụng và phân tích độ
   nhạy theo hệ số ngưỡng trong `site/data/audit-summary.json`
+- Công bố họ phụ thuộc, ma trận cặp kiểm định và q-value Benjamini-Hochberg theo
+  từng họ phụ thuộc để đọc các phép kiểm dùng chung dữ liệu
 - Kết quả snapshot có 2 phép nổi bật thống kê, 16 phép có hiệu ứng vượt ngưỡng
   thực dụng và 0 phép đạt đồng thời cả hai điều kiện
 

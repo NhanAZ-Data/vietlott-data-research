@@ -9,6 +9,7 @@ def test_research_documentation_and_issue_templates_exist() -> None:
     required = [
         ROOT / "docs" / "DATA_DICTIONARY.md",
         ROOT / "docs" / "AUDIT_EFFECT_THRESHOLDS.md",
+        ROOT / "docs" / "AUDIT_TEST_DEPENDENCIES.md",
         ROOT / "docs" / "METHODOLOGY_CHANGELOG.md",
         ROOT / "docs" / "templates" / "BAO_CAO_KET_QUA_AM.md",
         ROOT / "docs" / "DU_DOAN_BINGO18_0171884.md",
@@ -28,6 +29,7 @@ def test_readme_links_research_documents_without_em_dash() -> None:
 
     assert "docs/DATA_DICTIONARY.md" in readme
     assert "docs/AUDIT_EFFECT_THRESHOLDS.md" in readme
+    assert "docs/AUDIT_TEST_DEPENDENCIES.md" in readme
     assert "docs/METHODOLOGY_CHANGELOG.md" in readme
     assert "docs/templates/BAO_CAO_KET_QUA_AM.md" in readme
     assert "docs/DU_DOAN_BINGO18_0171884.md" in readme
@@ -53,3 +55,14 @@ def test_effect_threshold_documentation_has_required_review_fields() -> None:
     assert "Lập luận hoặc tham khảo" in document
     assert "Phân tích độ nhạy" in document
     assert "threshold_sensitivity" in document
+
+
+def test_audit_dependency_documentation_has_required_fields() -> None:
+    document = (ROOT / "docs" / "AUDIT_TEST_DEPENDENCIES.md").read_text(encoding="utf-8")
+
+    assert "dependency_matrix" in document
+    assert "q_value_dependency_family_bh" in document
+    assert "q_value_global_bh" in document
+    assert "high" in document
+    assert "medium" in document
+    assert "low" in document

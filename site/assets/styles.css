@@ -1947,6 +1947,110 @@ a {
   color: var(--ink-soft);
 }
 
+.audit-dependency-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgb(10 46 47 / 10%);
+  border-radius: 14px;
+  background: #fbfaf6;
+}
+
+.audit-dependency-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.audit-dependency-heading span,
+.audit-dependency-grid span,
+.audit-dependency-pairs span,
+.audit-dependency-pairs small {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.audit-dependency-heading strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.audit-dependency-heading p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.audit-dependency-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.audit-dependency-grid article {
+  min-height: 72px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f1ede2;
+}
+
+.audit-dependency-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+}
+
+.audit-dependency-grid .high {
+  background: #f7dfd6;
+}
+
+.audit-dependency-grid .medium {
+  background: #efe6d1;
+}
+
+.audit-dependency-grid .low {
+  background: #e5eee7;
+}
+
+.audit-dependency-pairs {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.audit-dependency-pairs article {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border-left: 4px solid #a9b8b1;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.audit-dependency-pairs article.high {
+  border-left-color: #ba624a;
+}
+
+.audit-dependency-pairs article.medium {
+  border-left-color: #b7944f;
+}
+
+.audit-dependency-pairs strong {
+  font-size: 13px;
+}
+
+.audit-dependency-pairs p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .method-note {
   margin: 20px 0 0;
   color: #687572;
@@ -3199,6 +3303,7 @@ a {
   .audit-conclusion-card,
   .audit-log-lead,
   .audit-log-products,
+  .audit-dependency-heading,
   .audit-test-row {
     grid-template-columns: 1fr;
   }
@@ -3283,11 +3388,13 @@ a {
 
   .data-ribbon-inner,
   .metric-grid,
-  .audit-summary-grid,
-  .audit-mini-grid,
-  .audit-family-list,
-  .audit-log-lead,
-  .audit-log-products,
+    .audit-summary-grid,
+    .audit-mini-grid,
+    .audit-family-list,
+    .audit-dependency-heading,
+    .audit-dependency-grid,
+    .audit-log-lead,
+    .audit-log-products,
   .threshold-sensitivity-grid,
   .two-column,
   .recent-draws,
