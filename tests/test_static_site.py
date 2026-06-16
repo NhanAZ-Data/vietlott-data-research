@@ -19,12 +19,12 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert 'id="phan-tich"' in index
     assert 'id="du-doan"' in index
     assert 'id="kiem-dinh"' in index
-    assert "assets/app.js?v=20260616-1" in index
+    assert "assets/app.js?v=20260616-2" in index
     assert "archive-summary-heading" in index
     assert "Sổ dự đoán toàn hệ thống" in index
     assert "assets/docs.js?v=20260615-1" in data_page
     for page in (index, method_page, data_page):
-        assert "assets/styles.css?v=20260616-2" in page
+        assert "assets/styles.css?v=20260616-3" in page
         assert "assets/favicon.svg?v=20260614-9" in page
         assert "fonts.googleapis.com/css2?family=Noto+Serif" in page
         assert "cdn-uicons.flaticon.com/3.0.0" in page
@@ -34,6 +34,7 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "display: none !important" in styles
     assert "min-height: 72px" in styles
     assert "archive-summary-heading" in styles
+    assert "archive-overview-grid" in styles
     assert '--font-display: "Noto Serif"' in styles
     assert "Georgia" not in styles
     assert "Cambria" not in styles
@@ -71,13 +72,17 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert 'text("exact-predictions"' in app_script
     assert 'text("archive-evaluated-draws"' in app_script
     assert "renderPredictionResults" in app_script
+    assert "setupPredictionProductFilters" in app_script
     assert "renderPredictionArchiveDetail" in app_script
     assert "renderPendingPrediction" in app_script
     assert "audit_signal" in app_script
     assert "Khai thác kiểm định công bằng" in app_script
     assert "prediction-history-list" in index
+    assert "prediction-history-label" in index
     assert "prediction-archive-detail-list" in index
     assert 'data-archive-filter="partial"' in index
+    assert "archive-exact-evaluated" not in index
+    assert 'data-product-filter="partial"' in app_script
     assert "Dự đoán gốc so với kết quả thật" in index
     assert "prediction-ledger-integrity" in index
     assert "Chuỗi hash hợp lệ" in app_script

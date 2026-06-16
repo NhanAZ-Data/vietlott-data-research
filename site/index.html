@@ -13,8 +13,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,500;1,400;1,500&amp;display=swap">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
-  <link rel="stylesheet" href="assets/styles.css?v=20260616-2">
-  <script src="assets/app.js?v=20260616-1" defer></script>
+  <link rel="stylesheet" href="assets/styles.css?v=20260616-3">
+  <script src="assets/app.js?v=20260616-2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Bỏ qua điều hướng</a>
@@ -554,7 +554,7 @@
           <div id="prediction-latest-comparison" class="prediction-comparison-grid"></div>
           <details class="prediction-history-panel">
             <summary>
-              <span>Mở toàn bộ lịch sử đối chiếu của sản phẩm</span>
+              <span id="prediction-history-label">Mở toàn bộ lịch sử đối chiếu của sản phẩm</span>
               <strong id="prediction-history-count">...</strong>
             </summary>
             <div id="prediction-history-list" class="prediction-history-list"></div>
@@ -567,7 +567,15 @@
             <p>Tổng hợp mọi sản phẩm và mọi cách dự đoán đã lưu, gồm lượt đã chấm và dự đoán còn chờ kết quả.</p>
           </div>
           <div class="archive-summary-groups">
-            <div class="archive-metric-grid archive-status-grid">
+            <div class="archive-metric-grid archive-overview-grid">
+              <button class="archive-metric" type="button" data-archive-filter="evaluated-draws" aria-controls="prediction-archive-detail">
+                <span>Kỳ đã đối chiếu</span>
+                <strong id="archive-evaluated-draws">...</strong>
+              </button>
+              <button class="archive-metric" type="button" data-archive-filter="evaluated-predictions" aria-controls="prediction-archive-detail">
+                <span>Lượt dự đoán</span>
+                <strong id="archive-evaluated-predictions">...</strong>
+              </button>
               <button class="archive-metric" type="button" data-archive-filter="exact" aria-controls="prediction-archive-detail">
                 <span>Đúng toàn bộ</span>
                 <strong id="exact-predictions">...</strong>
@@ -580,35 +588,13 @@
                 <span>Sai</span>
                 <strong id="wrong-predictions">...</strong>
               </button>
-              <button class="archive-metric" type="button" data-archive-filter="pending" aria-controls="prediction-archive-detail">
-                <span>Đang chờ kết quả</span>
-                <strong id="pending-predictions">...</strong>
-              </button>
-            </div>
-            <div class="archive-metric-grid archive-evaluated-grid">
-              <button class="archive-metric" type="button" data-archive-filter="evaluated-draws" aria-controls="prediction-archive-detail">
-                <span>Kỳ đã đối chiếu</span>
-                <strong id="archive-evaluated-draws">...</strong>
-              </button>
-              <button class="archive-metric" type="button" data-archive-filter="evaluated-predictions" aria-controls="prediction-archive-detail">
-                <span>Lượt dự đoán</span>
-                <strong id="archive-evaluated-predictions">...</strong>
-              </button>
-              <button class="archive-metric" type="button" data-archive-filter="exact" aria-controls="prediction-archive-detail">
-                <span>Đúng toàn bộ</span>
-                <strong id="archive-exact-evaluated">...</strong>
-              </button>
-              <button class="archive-metric" type="button" data-archive-filter="near" aria-controls="prediction-archive-detail">
-                <span>Gần đúng</span>
-                <strong id="archive-near-evaluated">...</strong>
-              </button>
-              <button class="archive-metric" type="button" data-archive-filter="wrong" aria-controls="prediction-archive-detail">
-                <span>Sai</span>
-                <strong id="archive-wrong-evaluated">...</strong>
-              </button>
               <button class="archive-metric" type="button" data-archive-filter="partial" aria-controls="prediction-archive-detail">
                 <span>Có trùng một phần</span>
                 <strong id="archive-partial-matches">...</strong>
+              </button>
+              <button class="archive-metric" type="button" data-archive-filter="pending" aria-controls="prediction-archive-detail">
+                <span>Đang chờ kết quả</span>
+                <strong id="pending-predictions">...</strong>
               </button>
             </div>
           </div>

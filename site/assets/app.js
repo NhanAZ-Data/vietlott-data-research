@@ -1472,9 +1472,6 @@ function renderPredictionShell(predictions, products) {
     "archive-evaluated-predictions",
     numberFormatter.format(outcome.evaluated_predictions || predictions.evaluation_count || 0),
   );
-  text("archive-exact-evaluated", numberFormatter.format(outcome.exact || 0));
-  text("archive-near-evaluated", numberFormatter.format(outcome.near || 0));
-  text("archive-wrong-evaluated", numberFormatter.format(outcome.wrong || 0));
   text("archive-partial-matches", numberFormatter.format(outcome.partial_matches || 0));
   text(
     "prediction-near-rule",
@@ -1648,7 +1645,6 @@ function renderPredictionResults(slug) {
   const productOutcome = state.predictions.product_outcomes?.[slug] || {};
   const summary = document.getElementById("prediction-product-summary");
   const latest = document.getElementById("prediction-latest-comparison");
-  const history = document.getElementById("prediction-history-list");
   const exact = Number(productOutcome.exact || 0);
   const near = Number(productOutcome.near || 0);
   const wrong = Number(productOutcome.wrong || 0);
@@ -1665,12 +1661,12 @@ function renderPredictionResults(slug) {
 
   summary.innerHTML = `
     <div class="prediction-product-metrics">
-      <div><span>Kỳ đã đối chiếu</span><strong>${numberFormatter.format(evaluatedDraws)}</strong></div>
-      <div><span>Lượt dự đoán</span><strong>${numberFormatter.format(evaluatedPredictions)}</strong></div>
-      <div><span>Đúng toàn bộ</span><strong>${numberFormatter.format(exact)}</strong></div>
-      <div><span>Gần đúng</span><strong>${numberFormatter.format(near)}</strong></div>
-      <div><span>Sai</span><strong>${numberFormatter.format(wrong)}</strong></div>
-      <div><span>Có trùng một phần</span><strong>${numberFormatter.format(partial)}</strong></div>
+      <button class="prediction-product-metric" type="button" data-product-filter="evaluated-draws" aria-controls="prediction-history-list"><span>Kỳ đã đối chiếu</span><strong>${numberFormatter.format(evaluatedDraws)}</strong></button>
+      <button class="prediction-product-metric" type="button" data-product-filter="evaluated-predictions" aria-controls="prediction-history-list"><span>Lượt dự đoán</span><strong>${numberFormatter.format(evaluatedPredictions)}</strong></button>
+      <button class="prediction-product-metric" type="button" data-product-filter="exact" aria-controls="prediction-history-list"><span>Đúng toàn bộ</span><strong>${numberFormatter.format(exact)}</strong></button>
+      <button class="prediction-product-metric" type="button" data-product-filter="near" aria-controls="prediction-history-list"><span>Gần đúng</span><strong>${numberFormatter.format(near)}</strong></button>
+      <button class="prediction-product-metric" type="button" data-product-filter="wrong" aria-controls="prediction-history-list"><span>Sai</span><strong>${numberFormatter.format(wrong)}</strong></button>
+      <button class="prediction-product-metric" type="button" data-product-filter="partial" aria-controls="prediction-history-list"><span>Có trùng một phần</span><strong>${numberFormatter.format(partial)}</strong></button>
     </div>
     <div class="prediction-hit-distribution">
       <span>${distributionLabel}</span>
@@ -1683,6 +1679,7 @@ function renderPredictionResults(slug) {
           .join("") || "<span>Chưa có lượt đã chấm</span>"}
       </div>
     </div>`;
+  setupPredictionProductFilters(evaluations, productOutcome, evaluatedPredictions);
 
   if (!evaluations.length) {
     latest.innerHTML = `
@@ -1690,8 +1687,9 @@ function renderPredictionResults(slug) {
         Chưa có kỳ mới để đối chiếu cho sản phẩm này. Dự đoán gốc vẫn được giữ
         nguyên trong sổ và sẽ tự chấm khi kết quả xác nhận xuất hiện.
       </div>`;
-    history.innerHTML = "";
-    text("prediction-history-count", "0 lượt");
+    renderPredictionProductHistory("evaluated-predictions", evaluations, productOutcome, evaluatedPredictions, {
+      open: false,
+    });
     return;
   }
 
@@ -1707,13 +1705,119 @@ function renderPredictionResults(slug) {
       <strong>#${escapeHtml(latestEvaluation.actual_draw_id)} · ${formatDate(latestEvaluation.actual_draw_date)}</strong>
     </div>
     ${latestDrawEvaluations.map(renderPredictionEvaluation).join("")}`;
-  history.innerHTML = evaluations.map(renderPredictionEvaluation).join("");
-  text(
-    "prediction-history-count",
-    evaluations.length < evaluatedPredictions
-      ? `${numberFormatter.format(evaluations.length)} lượt gần nhất / ${numberFormatter.format(evaluatedPredictions)} lượt`
-      : `${numberFormatter.format(evaluatedPredictions)} lượt`,
+  renderPredictionProductHistory("evaluated-predictions", evaluations, productOutcome, evaluatedPredictions, {
+    open: false,
+  });
+}
+
+function setupPredictionProductFilters(evaluations, productOutcome, evaluatedPredictions) {
+  document.querySelectorAll("[data-product-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      renderPredictionProductHistory(
+        button.dataset.productFilter || "evaluated-predictions",
+        evaluations,
+        productOutcome,
+        evaluatedPredictions,
+      );
+    });
+  });
+}
+
+function renderPredictionProductHistory(
+  filter,
+  evaluations,
+  productOutcome,
+  evaluatedPredictions,
+  options = {},
+) {
+  const panel = document.querySelector(".prediction-history-panel");
+  const label = document.getElementById("prediction-history-label");
+  const count = document.getElementById("prediction-history-count");
+  const list = document.getElementById("prediction-history-list");
+  if (!label || !count || !list) return;
+
+  const payload = predictionProductPayload(
+    filter,
+    evaluations,
+    productOutcome,
+    evaluatedPredictions,
   );
+  label.textContent = options.open === false
+    ? "Mở toàn bộ lịch sử đối chiếu của sản phẩm"
+    : `Chi tiết ${payload.kicker.toLowerCase()} của sản phẩm`;
+  count.textContent = payload.countLabel;
+  list.innerHTML = payload.rows.length
+    ? payload.rows.map(renderPredictionEvaluation).join("")
+    : `<div class="prediction-empty">${escapeHtml(payload.empty)}</div>`;
+
+  if (panel && options.open !== false) {
+    panel.open = true;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+function predictionProductPayload(filter, evaluations, productOutcome, evaluatedPredictions) {
+  const exact = Number(productOutcome.exact || 0);
+  const near = Number(productOutcome.near || 0);
+  const wrong = Number(productOutcome.wrong || 0);
+  const partial = Number(productOutcome.partial_matches || 0);
+  const evaluatedDraws = Number(productOutcome.evaluated_draws || 0);
+  const total = Number(evaluatedPredictions || evaluations.length);
+  const countLabel = (rows, totalCount) =>
+    rows.length < totalCount
+      ? `${numberFormatter.format(rows.length)} lượt gần nhất / ${numberFormatter.format(totalCount)} lượt`
+      : `${numberFormatter.format(totalCount)} lượt`;
+  const base = {
+    "evaluated-draws": {
+      rows: evaluations,
+      kicker: "Kỳ đã đối chiếu",
+      countLabel: `${numberFormatter.format(evaluatedDraws)} kỳ / ${numberFormatter.format(total)} lượt`,
+      empty: "Chưa có kỳ nào đủ điều kiện đối chiếu cho sản phẩm này.",
+    },
+    "evaluated-predictions": {
+      rows: evaluations,
+      kicker: "Lượt dự đoán",
+      countLabel: countLabel(evaluations, total),
+      empty: "Chưa có lượt dự đoán nào đã đối chiếu cho sản phẩm này.",
+    },
+    exact: {
+      rows: evaluations.filter((row) => row.outcome?.status === "exact"),
+      kicker: "Đúng toàn bộ",
+      countLabel: countLabel(
+        evaluations.filter((row) => row.outcome?.status === "exact"),
+        exact,
+      ),
+      empty: "Chưa có lượt nào đúng toàn bộ cho sản phẩm này.",
+    },
+    near: {
+      rows: evaluations.filter((row) => row.outcome?.status === "near"),
+      kicker: "Gần đúng",
+      countLabel: countLabel(
+        evaluations.filter((row) => row.outcome?.status === "near"),
+        near,
+      ),
+      empty: "Chưa có lượt gần đúng cho sản phẩm này.",
+    },
+    wrong: {
+      rows: evaluations.filter((row) => row.outcome?.status === "wrong"),
+      kicker: "Sai",
+      countLabel: countLabel(
+        evaluations.filter((row) => row.outcome?.status === "wrong"),
+        wrong,
+      ),
+      empty: "Chưa có lượt sai cho sản phẩm này.",
+    },
+    partial: {
+      rows: evaluations.filter((row) => row.outcome?.has_partial_match),
+      kicker: "Có trùng một phần",
+      countLabel: countLabel(
+        evaluations.filter((row) => row.outcome?.has_partial_match),
+        partial,
+      ),
+      empty: "Chưa có lượt nào trùng một phần cho sản phẩm này.",
+    },
+  };
+  return base[filter] || base["evaluated-predictions"];
 }
 
 function renderPredictionEvaluation(evaluation, options = {}) {
