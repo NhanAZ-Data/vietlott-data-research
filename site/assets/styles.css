@@ -2173,7 +2173,11 @@ a {
 }
 
 .backtest-prize-grid {
-  align-items: start;
+  grid-template-columns: 1fr;
+}
+
+.backtest-prize-grid .prize-report {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .number-map-layout {
@@ -3877,6 +3881,10 @@ a {
 
   .prediction-product-metrics {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .backtest-prize-grid .prize-report {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .prediction-hit-distribution,
