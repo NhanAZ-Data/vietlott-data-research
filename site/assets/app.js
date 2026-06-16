@@ -1700,11 +1700,15 @@ function renderPredictionResults(slug) {
       && evaluation.actual_draw_date === latestEvaluation.actual_draw_date,
   );
   latest.innerHTML = `
-    <div class="prediction-comparison-heading">
-      <span>Kỳ mới nhất đã chấm</span>
-      <strong>#${escapeHtml(latestEvaluation.actual_draw_id)} · ${formatDate(latestEvaluation.actual_draw_date)}</strong>
-    </div>
-    ${latestDrawEvaluations.map(renderPredictionEvaluation).join("")}`;
+    <details class="prediction-latest-panel">
+      <summary class="prediction-comparison-heading">
+        <span>Kỳ mới nhất đã chấm</span>
+        <strong>#${escapeHtml(latestEvaluation.actual_draw_id)} · ${formatDate(latestEvaluation.actual_draw_date)}</strong>
+      </summary>
+      <div class="prediction-latest-list">
+        ${latestDrawEvaluations.map(renderPredictionEvaluation).join("")}
+      </div>
+    </details>`;
   renderPredictionProductHistory("evaluated-predictions", evaluations, productOutcome, evaluatedPredictions, {
     open: false,
   });

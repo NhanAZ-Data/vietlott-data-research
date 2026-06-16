@@ -2967,17 +2967,62 @@ a {
   margin-top: 22px;
 }
 
+.prediction-latest-panel {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 5%);
+}
+
 .prediction-comparison-heading {
   display: flex;
+  min-height: 58px;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
+  padding: 14px 17px;
   color: rgb(255 255 255 / 52%);
+  cursor: pointer;
   font-size: 11px;
+  list-style: none;
   text-transform: uppercase;
 }
 
+.prediction-comparison-heading::-webkit-details-marker {
+  display: none;
+}
+
 .prediction-comparison-heading strong {
+  margin-left: auto;
   color: var(--paper);
+}
+
+.prediction-comparison-heading::after {
+  content: "+";
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 999px;
+  color: var(--acid);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.prediction-latest-panel[open] .prediction-comparison-heading::after {
+  content: "-";
+}
+
+.prediction-latest-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.prediction-latest-panel:not([open]) > .prediction-latest-list {
+  display: none;
 }
 
 .prediction-evaluation {
