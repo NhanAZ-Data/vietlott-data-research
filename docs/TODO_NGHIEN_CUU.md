@@ -406,7 +406,16 @@ file để giữ lại dấu vết thay đổi.
 
 ### P1.5 Kiểm soát tối ưu quá mức và rò rỉ dữ liệu
 
-- [ ] `BACKTEST-005` Thêm test tự động chứng minh mỗi dự đoán chỉ dùng dữ liệu trước kỳ đích.
+- [x] `BACKTEST-005` Thêm test tự động chứng minh mỗi dự đoán chỉ dùng dữ liệu trước kỳ đích.
+  - Hoàn thành ngày 18/06/2026.
+  - `test_number_backtest_predictions_use_only_prior_draws` monkeypatch các bước tính
+    điểm tập số và xác nhận `total_counts`, cửa sổ gần, cửa sổ ngắn, `last_seen` và
+    `pair_counts` tại từng kỳ chỉ khớp với `observations[:index]`.
+  - `test_digit_backtest_predictions_use_only_prior_draws` monkeypatch bước chọn chuỗi
+    chữ số và xác nhận toàn bộ counter theo vị trí chỉ dùng lịch sử trước kỳ đích cho
+    cả `balanced`, `recent` và `audit`.
+  - Các test này không đổi công thức điểm, JSON kết quả hoặc kết luận backtest; chúng
+    khóa hành vi chống rò rỉ dữ liệu trong `tests/test_prediction_ledger.py`.
 - [ ] `BACKTEST-006` Tách giai đoạn chọn công thức và giai đoạn đánh giá cuối.
 - [ ] `BACKTEST-007` Hiệu chỉnh nhiều phép thử trên mọi chiến lược, sản phẩm và biến thể
   tham số đã thử, không chỉ các mô hình cuối được công bố.

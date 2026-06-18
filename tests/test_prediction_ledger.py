@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 import pytest
 
+import vietlott_analytics.predictions as predictions_module
 from vietlott_analytics.catalog import PRODUCTS
 from vietlott_analytics.io import Observation, ProductDataset
 from vietlott_analytics.predictions import (
@@ -60,6 +61,20 @@ def _digit_dataset(draws: int) -> ProductDataset:
         validation_counts=Counter({"valid": draws}),
         latest_fetched_at=f"2024-03-{min(draws, 28):02d}T00:00:00+00:00",
     )
+
+
+def _number_observation_counts(observations: list[Observation]) -> Counter[int]:
+    return Counter(value for item in observations for value in item.values)
+
+
+def _digit_observation_counts(
+    observations: list[Observation],
+    positions: int,
+) -> list[Counter[int]]:
+    counters = [Counter() for _ in range(positions)]
+    for item in observations:
+        predictions_module._update_digit_counts(counters, item.outcomes, 1)
+    return counters
 
 
 def test_prediction_ledger_is_idempotent_and_appends_evaluations(tmp_path) -> None:
@@ -257,6 +272,115 @@ def test_walk_forward_backtest_reports_uniform_baseline() -> None:
     ):
         assert report[key]["target_scope_id"] == target_scope["scope_id"]
         assert report[key]["target_draw_count"] == target_scope["target_draw_count"]
+
+
+def test_number_backtest_predictions_use_only_prior_draws(monkeypatch) -> None:
+    dataset = _dataset(90)
+    observations = dataset.observations
+    start = 30
+    original_number_scores = predictions_module._number_scores
+    original_pair_scores = predictions_module._number_pair_scores_from_counts
+    score_calls: list[int] = []
+    pair_calls: list[int] = []
+
+    def guarded_pair_scores(product, pair_counts, draw_count):
+        history = observations[:draw_count]
+        assert pair_counts == predictions_module._number_pair_counts(history)
+        pair_calls.append(draw_count)
+        return original_pair_scores(product, pair_counts, draw_count)
+
+    def guarded_number_scores(
+        product,
+        total_counts,
+        total_draws,
+        recent_counts,
+        recent_draws,
+        short_counts,
+        short_draws,
+        last_seen,
+        current_index,
+    ):
+        history = observations[:total_draws]
+        expected_last_seen = {}
+        for index, item in enumerate(history):
+            for value in item.values:
+                expected_last_seen[value] = index
+        assert current_index == total_draws
+        assert total_counts == _number_observation_counts(history)
+        assert recent_counts == _number_observation_counts(
+            observations[total_draws - recent_draws : total_draws]
+        )
+        assert short_counts == _number_observation_counts(
+            observations[total_draws - short_draws : total_draws]
+        )
+        assert last_seen == expected_last_seen
+        score_calls.append(total_draws)
+        return original_number_scores(
+            product,
+            total_counts,
+            total_draws,
+            recent_counts,
+            recent_draws,
+            short_counts,
+            short_draws,
+            last_seen,
+            current_index,
+        )
+
+    monkeypatch.setattr(
+        predictions_module,
+        "_number_pair_scores_from_counts",
+        guarded_pair_scores,
+    )
+    monkeypatch.setattr(predictions_module, "_number_scores", guarded_number_scores)
+
+    report = build_backtest_report(dataset)
+
+    assert report["status"] == "complete"
+    assert score_calls == list(range(start, len(observations)))
+    assert pair_calls == list(range(start, len(observations)))
+
+
+def test_digit_backtest_predictions_use_only_prior_draws(monkeypatch) -> None:
+    dataset = _digit_dataset(90)
+    observations = dataset.observations
+    start = 30
+    positions = dataset.product.sequence_length or 0
+    original_digit_sequence = predictions_module._digit_sequence_from_scores
+    calls: list[tuple[int, str]] = []
+
+    def guarded_digit_sequence(total, recent, short, symbols, strategy, seed):
+        target_index = start + len(calls) // 3
+        assert total == _digit_observation_counts(
+            observations[:target_index],
+            positions,
+        )
+        assert recent == _digit_observation_counts(
+            observations[max(0, target_index - 500) : target_index],
+            positions,
+        )
+        assert short == _digit_observation_counts(
+            observations[max(0, target_index - 50) : target_index],
+            positions,
+        )
+        assert f"|{observations[target_index].draw_id}|" in seed
+        calls.append((target_index, strategy))
+        return original_digit_sequence(total, recent, short, symbols, strategy, seed)
+
+    monkeypatch.setattr(
+        predictions_module,
+        "_digit_sequence_from_scores",
+        guarded_digit_sequence,
+    )
+
+    report = build_backtest_report(dataset)
+
+    assert report["status"] == "complete"
+    assert calls == [
+        (index, strategy)
+        for index in range(start, len(observations))
+        for strategy in ("balanced", "recent", "audit")
+    ]
 
 
 def test_digit_walk_forward_backtest_reports_digit_score_formula() -> None:
