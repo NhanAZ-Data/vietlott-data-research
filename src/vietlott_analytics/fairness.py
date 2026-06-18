@@ -87,7 +87,9 @@ FAMILY_DESCRIPTIONS = [
     {
         "id": "change_point",
         "label": "Điểm đổi chế độ",
-        "plain_language": "So nửa đầu với nửa sau để tìm dấu hiệu quy trình thay đổi.",
+        "plain_language": (
+            "Quét các điểm cắt lịch sử đã đăng ký trước để tìm dấu hiệu quy trình thay đổi."
+        ),
     },
     {
         "id": "co_occurrence",
@@ -185,7 +187,7 @@ TEST_DEPENDENCY_PROFILES = {
         "dependency_family": "number_ordered_summary",
         "dependency_cluster": "number_sum_change",
         "dependency_tags": ["number_set", "ordered_draws", "draw_sum", "change_point"],
-        "data_view": "first-half and second-half draw sums",
+        "data_view": "pre-registered candidate split points over ordered draw sums",
     },
     "number_month_heterogeneity": {
         "dependency_family": "number_frequency_history",
@@ -245,7 +247,7 @@ TEST_DEPENDENCY_PROFILES = {
         "dependency_family": "digit_ordered_sequence",
         "dependency_cluster": "digit_sum_change",
         "dependency_tags": ["digit_sequence", "ordered_draws", "digit_sum", "change_point"],
-        "data_view": "first-half and second-half digit sums",
+        "data_view": "pre-registered candidate split points over ordered digit sums",
     },
     "digit_month_heterogeneity": {
         "dependency_family": "digit_frequency_distribution",
@@ -280,6 +282,9 @@ BLOCK_BOOTSTRAP_RESAMPLES = 199
 BLOCK_BOOTSTRAP_MIN_VALUES = 30
 BLOCK_BOOTSTRAP_MAX_VALUES = 2500
 BLOCK_BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
+CHANGE_POINT_CANDIDATE_FRACTIONS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+CHANGE_POINT_MIN_VALUES = 30
+CHANGE_POINT_MIN_SEGMENT_VALUES = 10
 
 EFFECT_THRESHOLD_REGISTRY = [
     {
@@ -361,7 +366,7 @@ EFFECT_THRESHOLD_REGISTRY = [
         "effect_size_name": "standardized mean difference",
         "threshold": 0.15,
         "unit": "|mean_2 - mean_1| / pooled_sd",
-        "scope": "So sánh split-half giữa nửa đầu và nửa sau lịch sử.",
+        "scope": "Quét change-point trên các điểm cắt lịch sử đã đăng ký trước.",
         "reference_or_rationale": (
             "Mốc này thấp hơn quy ước small-effect 0,20 của standardized mean "
             "difference để phục vụ cảnh báo sớm, nhưng vẫn buộc sai lệch phải lớn "
@@ -592,6 +597,8 @@ def audit_log_events(product_reports: list[dict[str, Any]]) -> Iterator[dict[str
                 "block_bootstrap_check",
                 {},
             )
+            change_point_scan = test.get("parameters", {}).get("change_point_scan", {})
+            strongest_change_point = change_point_scan.get("strongest_candidate", {})
             yield {
                 "schema_version": 1,
                 "event_type": "fairness_audit_test",
@@ -638,6 +645,12 @@ def audit_log_events(product_reports: list[dict[str, Any]]) -> Iterator[dict[str
                     "confidence_interval_upper"
                 ),
                 "block_bootstrap_block_length": block_bootstrap_check.get("block_length"),
+                "change_point_candidate_count": change_point_scan.get("candidate_count"),
+                "change_point_candidate_fraction": strongest_change_point.get(
+                    "candidate_fraction"
+                ),
+                "change_point_raw_p_value": change_point_scan.get("raw_p_value"),
+                "change_point_adjusted_p_value": change_point_scan.get("adjusted_p_value"),
                 "statistically_notable": test.get("statistically_notable"),
                 "practically_large": test.get("practically_large"),
                 "interpretation": test["interpretation"],
@@ -742,11 +755,11 @@ def _number_set_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
         ),
         _split_half_change_test(
             test_id="number_sum_split_half_change",
-            label="So nửa đầu và nửa sau bằng tổng bộ số",
+            label="Quét điểm đổi chế độ của tổng bộ số",
             values=draw_sums,
             plain_language=(
-                "Nếu quy trình ổn định, trung bình tổng bộ số giữa hai nửa lịch sử "
-                "không nên lệch lớn."
+                "Nếu quy trình ổn định, trung bình tổng bộ số không nên lệch lớn "
+                "ở bất kỳ điểm cắt lịch sử đã đăng ký trước nào."
             ),
         ),
         _month_heterogeneity_number_test(dataset, pool, frequencies),
@@ -816,11 +829,11 @@ def _digit_sequence_tests(dataset: ProductDataset) -> list[dict[str, Any]]:
         ),
         _split_half_change_test(
             test_id="digit_sum_split_half_change",
-            label="So nửa đầu và nửa sau bằng tổng chữ số",
+            label="Quét điểm đổi chế độ của tổng chữ số",
             values=digit_sums,
             plain_language=(
-                "Nếu quy trình ổn định, trung bình tổng chữ số giữa hai nửa lịch sử "
-                "không nên lệch lớn."
+                "Nếu quy trình ổn định, trung bình tổng chữ số không nên lệch lớn "
+                "ở bất kỳ điểm cắt lịch sử đã đăng ký trước nào."
             ),
         ),
         _month_heterogeneity_digit_test(dataset),
@@ -934,29 +947,109 @@ def _lag1_autocorrelation(values: list[int]) -> float | None:
     return _correlation(values[:-1], values[1:])
 
 
-def _split_half_statistics(values: list[int]) -> dict[str, float] | None:
-    if len(values) < 20:
-        return None
-    midpoint = len(values) // 2
-    first = values[:midpoint]
-    second = values[midpoint:]
-    if len(first) < 2 or len(second) < 2:
-        return None
+def _change_point_candidate_indices(value_count: int) -> list[int]:
+    if value_count < CHANGE_POINT_MIN_VALUES:
+        return []
+    min_segment = max(CHANGE_POINT_MIN_SEGMENT_VALUES, round(value_count * 0.1))
+    candidates = {
+        round(value_count * fraction)
+        for fraction in CHANGE_POINT_CANDIDATE_FRACTIONS
+    }
+    return sorted(
+        index
+        for index in candidates
+        if min_segment <= index <= value_count - min_segment
+    )
+
+
+def _change_point_candidate_statistics(
+    values: list[int],
+    candidate_index: int,
+) -> dict[str, float]:
+    first = values[:candidate_index]
+    second = values[candidate_index:]
+    first_mean = fmean(first)
+    second_mean = fmean(second)
     first_sd = stdev(first)
     second_sd = stdev(second)
     standard_error = math.sqrt((first_sd**2 / len(first)) + (second_sd**2 / len(second)))
-    difference = fmean(second) - fmean(first)
+    difference = second_mean - first_mean
     z_score = difference / standard_error if standard_error else 0.0
     pooled = math.sqrt((first_sd**2 + second_sd**2) / 2) if first_sd or second_sd else 0.0
     effect = abs(difference) / pooled if pooled else 0.0
-    power_sample_size = 1 / ((1 / len(first)) + (1 / len(second)))
     return {
-        "z_score": z_score,
+        "candidate_index": float(candidate_index),
+        "candidate_fraction": candidate_index / len(values),
+        "first_segment_count": float(len(first)),
+        "second_segment_count": float(len(second)),
+        "first_segment_mean": first_mean,
+        "second_segment_mean": second_mean,
         "difference": difference,
+        "z_score": z_score,
+        "max_abs_z_score": abs(z_score),
+        "raw_p_value": _two_sided_normal_p(z_score),
         "effect": effect,
-        "first_half_mean": fmean(first),
-        "second_half_mean": fmean(second),
-        "power_sample_size": power_sample_size,
+        "power_sample_size": 1 / ((1 / len(first)) + (1 / len(second))),
+    }
+
+
+def _public_change_point_candidate(row: dict[str, float]) -> dict[str, float | int]:
+    return {
+        "candidate_index": int(row["candidate_index"]),
+        "candidate_fraction": _round(row["candidate_fraction"], 4),
+        "first_segment_count": int(row["first_segment_count"]),
+        "second_segment_count": int(row["second_segment_count"]),
+        "first_segment_mean": _round(row["first_segment_mean"]),
+        "second_segment_mean": _round(row["second_segment_mean"]),
+        "difference": _round(row["difference"]),
+        "z_score": _round(row["z_score"]),
+        "raw_p_value": _round(row["raw_p_value"], 8),
+        "effect": _round(row["effect"]),
+    }
+
+
+def _change_point_scan_statistics(values: list[int]) -> dict[str, Any] | None:
+    candidate_indices = _change_point_candidate_indices(len(values))
+    if not candidate_indices:
+        return None
+    rows = [
+        _change_point_candidate_statistics(values, candidate_index)
+        for candidate_index in candidate_indices
+    ]
+    strongest = min(
+        rows,
+        key=lambda row: (row["raw_p_value"], -row["max_abs_z_score"], row["candidate_index"]),
+    )
+    raw_p_value = strongest["raw_p_value"]
+    adjusted_p_value = min(1.0, raw_p_value * len(rows))
+    public_candidates = [_public_change_point_candidate(row) for row in rows]
+    public_strongest = _public_change_point_candidate(strongest)
+    public_strongest["adjusted_p_value"] = _round(adjusted_p_value, 8)
+    return {
+        **strongest,
+        "candidate_count": len(rows),
+        "candidate_fractions": CHANGE_POINT_CANDIDATE_FRACTIONS,
+        "raw_p_value": raw_p_value,
+        "bonferroni_p_value": adjusted_p_value,
+        "adjusted_p_value": adjusted_p_value,
+        "multiple_candidate_correction": "bonferroni",
+        "scan": {
+            "status": "available",
+            "method": "pre_registered_candidate_scan",
+            "candidate_fractions": CHANGE_POINT_CANDIDATE_FRACTIONS,
+            "candidate_count": len(rows),
+            "minimum_segment_values": max(
+                CHANGE_POINT_MIN_SEGMENT_VALUES,
+                round(len(values) * 0.1),
+            ),
+            "multiple_candidate_correction": "bonferroni",
+            "statistic_name": "max_abs_z_score",
+            "raw_p_value": _round(raw_p_value, 8),
+            "adjusted_p_value": _round(adjusted_p_value, 8),
+            "strongest_candidate": public_strongest,
+            "candidates": public_candidates,
+            "no_unadjusted_search_decision": True,
+        },
     }
 
 
@@ -1276,46 +1369,49 @@ def _split_half_change_test(
     values: list[int],
     plain_language: str,
 ) -> dict[str, Any] | None:
-    stats = _split_half_statistics(values)
+    stats = _change_point_scan_statistics(values)
     if stats is None:
         return None
-    z_score = stats["z_score"]
+    max_abs_z_score = stats["max_abs_z_score"]
     effect = stats["effect"]
 
     def statistic_fn(sample: list[int]) -> float | None:
-        sample_stats = _split_half_statistics(sample)
-        return None if sample_stats is None else sample_stats["z_score"]
+        sample_stats = _change_point_scan_statistics(sample)
+        return None if sample_stats is None else sample_stats["max_abs_z_score"]
 
     permutation_check = _permutation_check(
         test_id=test_id,
         values=values,
-        statistic_name="z_score",
+        statistic_name="max_abs_z_score",
         statistic_fn=statistic_fn,
         preserve_unit=_permutation_preserve_unit(test_id),
     )
     block_bootstrap_check = _block_bootstrap_check(
         test_id=test_id,
         values=values,
-        statistic_name="z_score",
+        statistic_name="max_abs_z_score",
         statistic_fn=statistic_fn,
     )
     return _test_result(
         test_id=test_id,
         family="change_point",
-        algorithm="Split-Half Change-Point Test",
+        algorithm="Pre-Registered Multi-Candidate Change-Point Scan",
         label=label,
         plain_language=plain_language,
-        statistic_name="z_score",
-        statistic=z_score,
-        p_value=_two_sided_normal_p(z_score),
+        statistic_name="max_abs_z_score",
+        statistic=max_abs_z_score,
+        p_value=stats["bonferroni_p_value"],
         effect_size_name="standardized mean difference",
         effect_size=effect,
         practical_threshold=0.15,
         sample_size=len(values),
         power_sample_size=stats["power_sample_size"],
         parameters={
-            "first_half_mean": _round(stats["first_half_mean"]),
-            "second_half_mean": _round(stats["second_half_mean"]),
+            "first_segment_mean": _round(stats["first_segment_mean"]),
+            "second_segment_mean": _round(stats["second_segment_mean"]),
+            "first_half_mean": _round(stats["first_segment_mean"]),
+            "second_half_mean": _round(stats["second_segment_mean"]),
+            "change_point_scan": stats["scan"],
             "permutation_check": permutation_check,
             "block_bootstrap_check": block_bootstrap_check,
         },

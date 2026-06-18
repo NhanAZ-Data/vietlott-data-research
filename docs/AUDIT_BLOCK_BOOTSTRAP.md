@@ -15,6 +15,9 @@ Block bootstrap hiện gắn với cùng nhóm phép kiểm thứ tự:
 - `digit_value_lag1_autocorrelation`
 - `digit_sum_split_half_change`
 
+Hai test id có hậu tố `split_half_change` hiện dùng change-point scan nhiều điểm
+ứng viên từ `AUDIT-013`; id cũ được giữ để ổn định schema và dashboard.
+
 Mỗi lần bootstrap resample các block liền nhau cho đến khi tạo được chuỗi giả có
 cùng độ dài với chuỗi chẩn đoán. Thống kê được tính lại trên chuỗi giả để tạo khoảng
 ước lượng 95% cho thống kê chính.

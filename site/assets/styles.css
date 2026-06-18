@@ -1847,7 +1847,8 @@ a {
 }
 
 .audit-permutation-note,
-.audit-bootstrap-note {
+.audit-bootstrap-note,
+.audit-change-point-note {
   display: grid;
   gap: 4px;
   margin-top: 10px !important;
@@ -1858,14 +1859,16 @@ a {
 }
 
 .audit-permutation-note strong,
-.audit-bootstrap-note strong {
+.audit-bootstrap-note strong,
+.audit-change-point-note strong {
   margin: 0;
   color: var(--ink);
   font-size: 13px;
 }
 
 .audit-permutation-note span,
-.audit-bootstrap-note span {
+.audit-bootstrap-note span,
+.audit-change-point-note span {
   color: var(--ink-soft);
   font-size: 11px;
   font-weight: 750;

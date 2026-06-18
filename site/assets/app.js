@@ -959,6 +959,7 @@ function renderAuditTestRow(test) {
     : "N/A";
   const permutation = renderPermutationCheck(test.parameters?.permutation_check);
   const bootstrap = renderBlockBootstrapCheck(test.parameters?.block_bootstrap_check);
+  const changePoint = renderChangePointScan(test.parameters?.change_point_scan);
   return `
     <article class="audit-test-row ${escapeHtml(test.status)}">
       <div>
@@ -980,6 +981,7 @@ function renderAuditTestRow(test) {
         </dl>
         ${permutation}
         ${bootstrap}
+        ${changePoint}
       </div>
     </article>`;
 }
@@ -1023,6 +1025,21 @@ function renderBlockBootstrapCheck(check) {
     <p class="audit-bootstrap-note">
       <strong>Block bootstrap 95% [${escapeHtml(lower)}, ${escapeHtml(upper)}]</strong>
       <span>Block liên tiếp ${numberFormatter.format(check.block_length)} đơn vị${escapeHtml(sampleText)}; không đổi q/status.</span>
+    </p>`;
+}
+
+function renderChangePointScan(scan) {
+  if (!scan || scan.status !== "available") return "";
+  const strongest = scan.strongest_candidate || {};
+  const fraction = strongest.candidate_fraction == null
+    ? "N/A"
+    : formatPercent(strongest.candidate_fraction, 0);
+  const rawP = scan.raw_p_value == null ? "N/A" : formatPValue(scan.raw_p_value);
+  const adjustedP = scan.adjusted_p_value == null ? "N/A" : formatPValue(scan.adjusted_p_value);
+  return `
+    <p class="audit-change-point-note">
+      <strong>Change-point scan ${numberFormatter.format(scan.candidate_count || 0)} điểm</strong>
+      <span>Mạnh nhất tại ${escapeHtml(fraction)} lịch sử; p thô ${escapeHtml(rawP)}, p Bonferroni ${escapeHtml(adjustedP)}.</span>
     </p>`;
 }
 

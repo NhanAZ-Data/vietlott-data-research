@@ -9,7 +9,7 @@ quay hoặc cùng câu hỏi thống kê.
 
 Chi-square và G-test cho tần suất biên thường cùng hỏi một câu: các số hoặc chữ
 số có lệch khỏi phân bố đều hay không. Runs test, tự tương quan lag-1 và
-split-half cũng cùng đọc một chuỗi theo thứ tự thời gian. Nếu xem mọi p-value như
+change-point scan cũng cùng đọc một chuỗi theo thứ tự thời gian. Nếu xem mọi p-value như
 những bằng chứng độc lập, người đọc có thể đánh giá quá mạnh một tín hiệu lặp lại
 từ cùng lát dữ liệu.
 

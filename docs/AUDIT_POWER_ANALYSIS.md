@@ -20,7 +20,7 @@ MDE = (z_(1 - alpha / 2) + z_power) / sqrt(n_hiệu_dụng)
 
 - kiểm định tần suất pooled dùng số lượt số hoặc chữ số quan sát được;
 - kiểm định vị trí chữ số dùng `outcomes × số vị trí`;
-- split-half dùng cỡ mẫu hiệu dụng của hai nửa;
+- change-point scan dùng cỡ mẫu hiệu dụng của hai đoạn tại ứng viên mạnh nhất;
 - repeat-rate dùng số cặp lặp kỳ vọng.
 
 ## Trường dữ liệu

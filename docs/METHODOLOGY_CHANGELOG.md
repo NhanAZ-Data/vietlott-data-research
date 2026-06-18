@@ -20,6 +20,10 @@ backtest hoặc cách đọc website. Thay đổi giao diện thuần túy khôn
   p-value, q-value hoặc `status`
 - Chuỗi rất dài trong block bootstrap dùng tối đa 2.500 đơn vị lấy đều quyết định
   sẵn, kèm `block_length` và `sampling_method` trong JSON
+- Thay phép so split-half duy nhất của hai test `*_split_half_change` bằng
+  `parameters.change_point_scan`, quét các điểm cắt 20% đến 80% đã đăng ký trước
+- P-value chính của change-point scan dùng Bonferroni theo số điểm ứng viên, còn
+  `raw_p_value` chỉ là trường giải thích ứng viên mạnh nhất
 
 ## 15/06/2026
 

@@ -123,6 +123,24 @@ def test_number_audit_contains_lightweight_fairness_tests() -> None:
         assert bootstrap["preserve_time_structure"] == "contiguous_observation_blocks"
         assert bootstrap["no_multiple_testing_decision"] is True
         assert bootstrap["confidence_interval_lower"] <= bootstrap["confidence_interval_upper"]
+    change_point_test = next(
+        test
+        for test in active_tests
+        if test["id"] == "number_sum_split_half_change"
+    )
+    assert change_point_test["algorithm"] == "Pre-Registered Multi-Candidate Change-Point Scan"
+    assert change_point_test["statistic_name"] == "max_abs_z_score"
+    scan = change_point_test["parameters"]["change_point_scan"]
+    assert scan["status"] == "available"
+    assert scan["method"] == "pre_registered_candidate_scan"
+    assert scan["multiple_candidate_correction"] == "bonferroni"
+    assert scan["candidate_count"] >= 3
+    assert len(scan["candidates"]) == scan["candidate_count"]
+    assert scan["adjusted_p_value"] >= scan["raw_p_value"]
+    assert scan["no_unadjusted_search_decision"] is True
+    strongest = scan["strongest_candidate"]
+    assert 0 < strongest["candidate_fraction"] < 1
+    assert "adjusted_p_value" in strongest
 
 
 def test_finalize_audits_adds_global_correction_and_jsonl_events() -> None:
@@ -181,6 +199,8 @@ def test_finalize_audits_adds_global_correction_and_jsonl_events() -> None:
     assert any(event["permutation_p_value"] is not None for event in events)
     assert any(event["block_bootstrap_status"] == "available" for event in events)
     assert any(event["block_bootstrap_interval_lower"] is not None for event in events)
+    assert any(event["change_point_candidate_count"] is not None for event in events)
+    assert any(event["change_point_adjusted_p_value"] is not None for event in events)
     assert any(event["q_value_dependency_family_bh"] is not None for event in events)
     assert all(
         "q_value_global_bh" in test

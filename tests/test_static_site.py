@@ -19,12 +19,12 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert 'id="phan-tich"' in index
     assert 'id="du-doan"' in index
     assert 'id="kiem-dinh"' in index
-    assert "assets/app.js?v=20260618-6" in index
+    assert "assets/app.js?v=20260618-7" in index
     assert "archive-summary-heading" in index
     assert "Sổ dự đoán toàn hệ thống" in index
     assert "assets/docs.js?v=20260618-2" in data_page
     for page in (index, method_page, data_page):
-        assert "assets/styles.css?v=20260618-5" in page
+        assert "assets/styles.css?v=20260618-6" in page
         assert "assets/favicon.svg?v=20260614-9" in page
         assert "fonts.googleapis.com/css2?family=Noto+Serif" in page
         assert "cdn-uicons.flaticon.com/3.0.0" in page
@@ -69,6 +69,10 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "renderBlockBootstrapCheck" in app_script
     assert "Block bootstrap 95%" in app_script
     assert "audit-bootstrap-note" in styles
+    assert "renderChangePointScan" in app_script
+    assert "Change-point scan" in app_script
+    assert "p Bonferroni" in app_script
+    assert "audit-change-point-note" in styles
     assert "renderAuditDependencyMatrix" in app_script
     assert "Ma trận phụ thuộc" in app_script
     assert "q theo họ" in app_script
@@ -284,6 +288,15 @@ def test_generated_site_data_matches_manifest() -> None:
             assert bootstrap["confidence_interval_lower"] <= bootstrap[
                 "confidence_interval_upper"
             ]
+            if item["id"].endswith("split_half_change"):
+                scan = item["parameters"]["change_point_scan"]
+                assert scan["status"] == "available"
+                assert scan["method"] == "pre_registered_candidate_scan"
+                assert scan["multiple_candidate_correction"] == "bonferroni"
+                assert scan["candidate_count"] >= 3
+                assert len(scan["candidates"]) == scan["candidate_count"]
+                assert scan["adjusted_p_value"] >= scan["raw_p_value"]
+                assert scan["no_unadjusted_search_decision"] is True
         if product["slug"] in {"max3d", "max4d"}:
             position_test = next(
                 item

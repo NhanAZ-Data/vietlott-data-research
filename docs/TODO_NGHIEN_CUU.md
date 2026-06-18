@@ -313,9 +313,17 @@ file để giữ lại dấu vết thay đổi.
   - Website hiển thị `Block bootstrap 95%`; tài liệu hóa trong
     `docs/AUDIT_BLOCK_BOOTSTRAP.md` và khóa bằng unit test, documentation test,
     static-site test.
-- [ ] `AUDIT-013` Thay split-half duy nhất bằng change-point có nhiều điểm ứng viên.
-  - Có thể thử PELT hoặc binary segmentation
-  - Phải hiệu chỉnh việc tìm kiếm nhiều điểm
+- [x] `AUDIT-013` Thay split-half duy nhất bằng change-point có nhiều điểm ứng viên.
+  - Hoàn thành ngày 18/06/2026.
+  - Hai test id `number_sum_split_half_change` và `digit_sum_split_half_change` được giữ để
+    ổn định schema, nhưng thuật toán chuyển sang `pre_registered_candidate_scan`.
+  - Quét các điểm cắt đã khóa trước ở 20%, 30%, 40%, 50%, 60%, 70% và 80% lịch sử,
+    chọn ứng viên có `max_abs_z_score` mạnh nhất.
+  - `p_value` chính dùng `adjusted_p_value` theo Bonferroni trên số ứng viên; `raw_p_value`
+    chỉ phục vụ giải thích và không dùng làm quyết định chưa hiệu chỉnh.
+  - Website hiển thị `Change-point scan`; tài liệu hóa trong
+    `docs/AUDIT_CHANGE_POINT_SCAN.md` và khóa bằng unit test, documentation test,
+    static-site test.
 
 - [ ] `AUDIT-014` Triển khai phép kiểm đồng xuất hiện Keno có thể mở rộng.
   - Hiện phép kiểm bị bỏ qua vì có 54.089.580 quan sát cặp

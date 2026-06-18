@@ -16,6 +16,9 @@ Permutation check hiện gắn với các phép kiểm:
 - `digit_value_lag1_autocorrelation`
 - `digit_sum_split_half_change`
 
+Hai test id có hậu tố `split_half_change` hiện dùng change-point scan nhiều điểm
+ứng viên từ `AUDIT-013`; id cũ được giữ để ổn định schema và dashboard.
+
 Với sản phẩm tập số, đơn vị hoán vị là `whole_draw_sum`: tổng của toàn bộ bộ số
 trong một kỳ. Các số trong cùng kỳ không bị tráo lẫn với kỳ khác. Với sản phẩm chuỗi
 chữ số, đơn vị hoán vị là `whole_digit_value` hoặc `whole_digit_sum`, tức mỗi kết quả
