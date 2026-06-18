@@ -368,7 +368,17 @@ file để giữ lại dấu vết thay đổi.
     ước lượng 95%. Bằng chứng `src/vietlott_analytics/predictions.py`,
     `site/data/manifest.json` và `tests/test_prediction_ledger.py`. Chờ CI.
 
-- [ ] `BACKTEST-002` Đảm bảo mọi chiến lược được đánh giá trên đúng cùng tập kỳ đích.
+- [x] `BACKTEST-002` Đảm bảo mọi chiến lược được đánh giá trên đúng cùng tập kỳ đích.
+  - Hoàn thành ngày 18/06/2026.
+  - Mỗi báo cáo backtest có `target_scope` khóa danh sách kỳ mục tiêu bằng SHA-256;
+    `model`, `recent_model`, `audit_model`, `baseline` và ba comparison đều phải
+    dùng chung `target_scope_id` và `target_draw_count`.
+  - `finalize_backtests` validate scope trước khi hiệu chỉnh Benjamini-Hochberg và
+    `manifest.backtest_summary.target_scope_validation` công bố trạng thái toàn hệ
+    thống.
+  - Website hiển thị "Tập kỳ mục tiêu chung"; tài liệu hóa trong
+    `docs/BACKTEST_TARGET_SCOPE.md` và khóa bằng unit test, documentation test,
+    static-site test.
 - [ ] `BACKTEST-003` Công bố công thức điểm cho từng loại sản phẩm.
   - Không gộp điểm của tập số và chuỗi chữ số thành cùng một thước đo tổng
 

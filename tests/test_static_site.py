@@ -131,6 +131,8 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "Backtest đang chạy chính xác những gì" in method_page
     assert "Kiểm định chênh lệch ghép cặp" in method_page
     assert "phân bố siêu bội chính xác" in method_page
+    assert "Tập kỳ mục tiêu chung" in app_script
+    assert "target_scope" in app_script
     assert "Ba chiến lược ứng viên" in method_page
     assert "hiệu chỉnh Benjamini-Hochberg" in method_page
     assert "trung_bình(d) ± 1,96 × sai_số_chuẩn" in method_page
@@ -195,6 +197,10 @@ def test_generated_site_data_matches_manifest() -> None:
     assert manifest["analysis_export"]["path"] == "data/analysis-export.json"
     assert manifest["backtest_summary"]["multiple_testing_method"] == "benjamini_hochberg"
     assert manifest["backtest_summary"]["comparison_count"] == 24
+    target_scope_validation = manifest["backtest_summary"]["target_scope_validation"]
+    assert target_scope_validation["status"] == "validated"
+    assert target_scope_validation["product_count"] == len(manifest["products"])
+    assert target_scope_validation["method"] == "shared_target_scope_id_per_product"
     assert predictions["model_version"]
     assert predictions["ledger_integrity"]["status"] == "valid"
     assert predictions["ledger_integrity"]["event_count"] > 0
@@ -387,3 +393,23 @@ def test_generated_site_data_matches_manifest() -> None:
                 )
         assert report["backtest"]["recent_model"]["strategy"] == "recent_frequency"
         assert "recent_comparison" in report["backtest"]
+        target_scope = report["backtest"]["target_scope"]
+        assert target_scope["method"] == "same_confirmed_draw_targets_for_all_strategies"
+        assert target_scope["target_draw_count"] == report["backtest"]["samples"]
+        assert target_scope["no_strategy_specific_filtering"] is True
+        assert len(target_scope["target_draw_ids_sha256"]) == 64
+        for key in (
+            "model",
+            "recent_model",
+            "audit_model",
+            "baseline",
+            "comparison",
+            "recent_comparison",
+            "audit_comparison",
+        ):
+            assert report["backtest"][key]["target_scope_id"] == target_scope[
+                "scope_id"
+            ]
+            assert report["backtest"][key]["target_draw_count"] == target_scope[
+                "target_draw_count"
+            ]

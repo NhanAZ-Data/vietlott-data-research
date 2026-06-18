@@ -38,6 +38,14 @@ AUDIT_DIGIT_SCORE_POLICY = (
 PAIR_WINDOW_LIMIT = 5000
 NORMAL = NormalDist()
 BACKTEST_MULTIPLE_TESTING_ALPHA = 0.05
+BACKTEST_MODEL_KEYS = ("model", "recent_model", "audit_model")
+BACKTEST_COMPARISON_KEYS = ("comparison", "recent_comparison", "audit_comparison")
+BACKTEST_SCOPE_STRATEGIES = (
+    "balanced_signal",
+    "recent_frequency",
+    "audit_signal",
+    "uniform_exact_expectation",
+)
 
 
 @dataclass(slots=True)
@@ -350,13 +358,29 @@ def build_backtest_report(dataset: ProductDataset) -> dict[str, object]:
 
 def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
     comparisons: list[tuple[dict[str, Any], str]] = []
+    target_scopes: list[dict[str, Any]] = []
     completed_products = 0
     for report in product_reports:
         backtest = report.get("backtest")
         if not isinstance(backtest, dict) or backtest.get("status") != "complete":
             continue
+        _validate_backtest_target_scope(backtest)
         completed_products += 1
         product_slug = str(report["product"]["slug"])
+        target_scope = backtest.get("target_scope")
+        if isinstance(target_scope, dict):
+            target_scopes.append(
+                {
+                    "product": product_slug,
+                    "scope_id": target_scope.get("scope_id"),
+                    "target_draw_count": target_scope.get("target_draw_count"),
+                    "first_target_draw_id": target_scope.get("first_target_draw_id"),
+                    "latest_target_draw_id": target_scope.get("latest_target_draw_id"),
+                    "target_draw_ids_sha256": target_scope.get(
+                        "target_draw_ids_sha256"
+                    ),
+                }
+            )
         for key in ("comparison", "recent_comparison", "audit_comparison"):
             comparison = backtest.get(key)
             if isinstance(comparison, dict) and isinstance(
@@ -398,11 +422,76 @@ def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
         "unadjusted_winning_comparisons": unadjusted_wins,
         "products_with_adjusted_win": sorted(products_with_adjusted_win),
         "products_with_unadjusted_win": sorted(products_with_unadjusted_win),
+        "target_scope_validation": {
+            "status": "validated",
+            "method": "shared_target_scope_id_per_product",
+            "product_count": len(target_scopes),
+            "strategy_keys": list(BACKTEST_SCOPE_STRATEGIES),
+            "products": target_scopes,
+            "interpretation": (
+                "Mỗi sản phẩm dùng cùng target_scope_id cho baseline, ba chiến lược "
+                "và ba phép so sánh ghép cặp."
+            ),
+        },
         "interpretation": (
             "Chỉ nhãn đã hiệu chỉnh mới được dùng cho kết luận tổng quan. "
             "Nhãn chưa hiệu chỉnh được giữ lại để kiểm tra độ nhạy."
         ),
     }
+
+
+def _backtest_target_scope(
+    product: AnalyticsProduct,
+    targets: list[Observation],
+) -> dict[str, Any]:
+    digest = hashlib.sha256()
+    digest.update(f"{product.slug}|{len(targets)}\n".encode())
+    for target in targets:
+        digest.update(f"{target.draw_id}|{target.draw_date.isoformat()}\n".encode())
+    target_ids = [target.draw_id for target in targets]
+    target_dates = [target.draw_date.isoformat() for target in targets]
+    target_hash = digest.hexdigest()
+    return {
+        "schema_version": 1,
+        "scope_id": target_hash[:24],
+        "method": "same_confirmed_draw_targets_for_all_strategies",
+        "target": "walk_forward_confirmed_draws",
+        "target_draw_count": len(targets),
+        "first_target_draw_id": target_ids[0],
+        "latest_target_draw_id": target_ids[-1],
+        "first_target_draw_date": target_dates[0],
+        "latest_target_draw_date": target_dates[-1],
+        "target_draw_ids_sha256": target_hash,
+        "sample_target_draw_ids": {
+            "first": target_ids[:5],
+            "last": target_ids[-5:],
+        },
+        "shared_by": list(BACKTEST_SCOPE_STRATEGIES),
+        "no_strategy_specific_filtering": True,
+    }
+
+
+def _target_scope_fields(target_scope: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "target_scope_id": target_scope["scope_id"],
+        "target_draw_count": target_scope["target_draw_count"],
+    }
+
+
+def _validate_backtest_target_scope(backtest: dict[str, Any]) -> None:
+    target_scope = backtest.get("target_scope")
+    if not isinstance(target_scope, dict):
+        raise ValueError("Backtest target_scope missing")
+    expected_scope_id = target_scope.get("scope_id")
+    expected_count = target_scope.get("target_draw_count")
+    for key in ("baseline", *BACKTEST_MODEL_KEYS, *BACKTEST_COMPARISON_KEYS):
+        row = backtest.get(key)
+        if not isinstance(row, dict):
+            continue
+        if row.get("target_scope_id") != expected_scope_id:
+            raise ValueError(f"Backtest {key} target_scope_id mismatch")
+        if row.get("target_draw_count") != expected_count:
+            raise ValueError(f"Backtest {key} target_draw_count mismatch")
 
 
 def _forecast_events(dataset: ProductDataset) -> list[dict[str, Any]]:
@@ -626,6 +715,8 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
     start = max(minimum_history, len(observations) - limit)
     if start >= len(observations):
         return {"status": "insufficient_data", "samples": 0}
+    target_scope = _backtest_target_scope(product, observations[start:])
+    scope_fields = _target_scope_fields(target_scope)
 
     recent_window = 500 if product.slug == "keno" else 200
     short_window = 50
@@ -736,11 +827,12 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
         fmean(recent_differences) > 0 and recent_p_value < 0.05
     )
     audit_comparison_wins = fmean(audit_differences) > 0 and audit_p_value < 0.05
-    return {
+    report = {
         "schema_version": 2,
         "status": "complete",
         "method": "walk_forward",
         "samples": len(model_hits),
+        "target_scope": target_scope,
         "first_test_draw_id": observations[start].draw_id,
         "latest_test_draw_id": observations[-1].draw_id,
         "initial_training_draws": start,
@@ -752,18 +844,21 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
         "audit_score_policy": AUDIT_NUMBER_SCORE_POLICY,
         "model": {
             "strategy": "balanced_signal",
+            **scope_fields,
             "average_hits": _round(fmean(model_hits)),
             "exact_hits": model_distribution[product.pick_count or 0],
             "hit_distribution": _counter_to_rows(model_distribution),
         },
         "recent_model": {
             "strategy": "recent_frequency",
+            **scope_fields,
             "average_hits": _round(fmean(recent_hits)),
             "exact_hits": recent_distribution[product.pick_count or 0],
             "hit_distribution": _counter_to_rows(recent_distribution),
         },
         "audit_model": {
             "strategy": "audit_signal",
+            **scope_fields,
             "average_hits": _round(fmean(audit_hits)),
             "exact_hits": audit_distribution[product.pick_count or 0],
             "hit_distribution": _counter_to_rows(audit_distribution),
@@ -771,6 +866,7 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
         "baseline": {
             "strategy": "uniform_exact_expectation",
             "method": "exact_hypergeometric_expectation",
+            **scope_fields,
             "average_hits": _round(expected_hits),
             "expected_average_hits": _round(expected_hits),
             "expected_exact_hits": _round(len(model_hits) * exact_probability),
@@ -778,6 +874,7 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "hit_distribution": baseline_distribution,
         },
         "comparison": {
+            **scope_fields,
             "mean_hit_difference": _round(fmean(differences)),
             "paired_z_score": _round(z_score),
             "approximate_p_value": _round(p_value, 8),
@@ -786,6 +883,7 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "beats_baseline": False,
         },
         "recent_comparison": {
+            **scope_fields,
             "mean_hit_difference": _round(fmean(recent_differences)),
             "paired_z_score": _round(recent_z_score),
             "approximate_p_value": _round(recent_p_value, 8),
@@ -794,6 +892,7 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "beats_baseline": False,
         },
         "audit_comparison": {
+            **scope_fields,
             "mean_hit_difference": _round(fmean(audit_differences)),
             "paired_z_score": _round(audit_z_score),
             "approximate_p_value": _round(audit_p_value, 8),
@@ -807,6 +906,8 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "được kết luận sau hiệu chỉnh nhiều phép thử trên toàn bộ sản phẩm."
         ),
     }
+    _validate_backtest_target_scope(report)
+    return report
 
 
 def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
@@ -817,6 +918,8 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
     start = max(minimum_history, len(observations) - limit)
     if start >= len(observations):
         return {"status": "insufficient_data", "samples": 0}
+    target_scope = _backtest_target_scope(product, observations[start:])
+    scope_fields = _target_scope_fields(target_scope)
 
     length = product.sequence_length or 0
     symbols = list(range(product.sequence_min, product.sequence_max + 1))
@@ -921,11 +1024,12 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
         fmean(recent_differences) > 0 and recent_p_value < 0.05
     )
     audit_comparison_wins = fmean(audit_differences) > 0 and audit_p_value < 0.05
-    return {
+    report = {
         "schema_version": 2,
         "status": "complete",
         "method": "walk_forward",
         "samples": samples,
+        "target_scope": target_scope,
         "first_test_draw_id": observations[start].draw_id,
         "latest_test_draw_id": observations[-1].draw_id,
         "initial_training_draws": start,
@@ -938,18 +1042,21 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
         "audit_score_policy": AUDIT_DIGIT_SCORE_POLICY,
         "model": {
             "strategy": "balanced_signal",
+            **scope_fields,
             "exact_hits": model_exact,
             "exact_hit_rate": _round(model_exact / samples),
             "average_best_position_matches": _round(fmean(model_best)),
         },
         "recent_model": {
             "strategy": "recent_frequency",
+            **scope_fields,
             "exact_hits": recent_exact,
             "exact_hit_rate": _round(recent_exact / samples),
             "average_best_position_matches": _round(fmean(recent_best)),
         },
         "audit_model": {
             "strategy": "audit_signal",
+            **scope_fields,
             "exact_hits": audit_exact,
             "exact_hit_rate": _round(audit_exact / samples),
             "average_best_position_matches": _round(fmean(audit_best)),
@@ -957,6 +1064,7 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
         "baseline": {
             "strategy": "uniform_exact_expectation",
             "method": "exact_sequence_enumeration",
+            **scope_fields,
             "candidate_space_size": len(symbols) ** length,
             "expected_exact_hits": _round(sum(baseline_exact_expected)),
             "expected_exact_hit_rate": _round(fmean(baseline_exact_expected)),
@@ -967,6 +1075,7 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             ),
         },
         "comparison": {
+            **scope_fields,
             "mean_position_match_difference": _round(fmean(differences)),
             "paired_z_score": _round(z_score),
             "approximate_p_value": _round(p_value, 8),
@@ -975,6 +1084,7 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             "beats_baseline": False,
         },
         "recent_comparison": {
+            **scope_fields,
             "mean_position_match_difference": _round(
                 fmean(recent_differences)
             ),
@@ -985,6 +1095,7 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             "beats_baseline": False,
         },
         "audit_comparison": {
+            **scope_fields,
             "mean_position_match_difference": _round(fmean(audit_differences)),
             "paired_z_score": _round(audit_z_score),
             "approximate_p_value": _round(audit_p_value, 8),
@@ -998,6 +1109,8 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             "vì vậy p-value vẫn chỉ là xấp xỉ và cần được đọc cùng kích thước hiệu ứng."
         ),
     }
+    _validate_backtest_target_scope(report)
+    return report
 
 
 def _number_scores(

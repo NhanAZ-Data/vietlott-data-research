@@ -218,6 +218,10 @@ def _build_analysis_export(
                     "scope": "all completed product-strategy comparisons",
                     "alpha": 0.05,
                 },
+                "target_scope_validation": manifest.get("backtest_summary", {}).get(
+                    "target_scope_validation",
+                    {},
+                ),
                 "win_rule": "mean_difference > 0 and global_bh_q < 0.05",
                 "important_limitations": [
                     "Điểm backtest tập số hiện chỉ tính số chính, chưa tính số đặc biệt.",

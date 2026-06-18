@@ -33,6 +33,15 @@ backtest hoặc cách đọc website. Thay đổi giao diện thuần túy khôn
   loại `not_confirmed` và so lại statistic/effect trên lát `source_verification`
   đáng tin cậy khi đủ mẫu; bảng này không tạo p-value, q-value hoặc status mới
 
+### Backtest 2.0.0
+
+- Thêm `target_scope` cho từng backtest sản phẩm, khóa SHA-256 danh sách kỳ mục
+  tiêu và bắt `model`, `recent_model`, `audit_model`, `baseline` cùng ba
+  comparison dùng chung `target_scope_id`
+- `manifest.backtest_summary.target_scope_validation` công bố trạng thái validate
+  toàn hệ thống; thay đổi này không đổi công thức điểm, p-value, q-value hoặc
+  kết luận, chỉ khóa mẫu so sánh
+
 ## 15/06/2026
 
 ### Fairness audit 2.0.0

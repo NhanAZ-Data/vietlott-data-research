@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from copy import deepcopy
 from datetime import date, timedelta
 
 import pytest
@@ -169,6 +170,12 @@ def test_walk_forward_backtest_reports_uniform_baseline() -> None:
     assert report["status"] == "complete"
     assert report["method"] == "walk_forward"
     assert report["samples"] > 0
+    target_scope = report["target_scope"]
+    assert target_scope["method"] == "same_confirmed_draw_targets_for_all_strategies"
+    assert target_scope["target_draw_count"] == report["samples"]
+    assert target_scope["first_target_draw_id"] == report["first_test_draw_id"]
+    assert target_scope["latest_target_draw_id"] == report["latest_test_draw_id"]
+    assert target_scope["no_strategy_specific_filtering"] is True
     assert report["baseline"]["strategy"] == "uniform_exact_expectation"
     assert report["baseline"]["method"] == "exact_hypergeometric_expectation"
     assert report["baseline"]["average_hits"] == 0.8
@@ -184,6 +191,17 @@ def test_walk_forward_backtest_reports_uniform_baseline() -> None:
         <= report["comparison"]["confidence_interval_upper"]
     )
     assert report["comparison"]["beats_baseline"] is False
+    for key in (
+        "model",
+        "recent_model",
+        "audit_model",
+        "baseline",
+        "comparison",
+        "recent_comparison",
+        "audit_comparison",
+    ):
+        assert report[key]["target_scope_id"] == target_scope["scope_id"]
+        assert report[key]["target_draw_count"] == target_scope["target_draw_count"]
 
 
 def test_digit_uniform_expectation_enumerates_complete_space() -> None:
@@ -204,18 +222,28 @@ def test_digit_uniform_expectation_enumerates_complete_space() -> None:
 
 
 def test_finalize_backtests_applies_global_bh_correction() -> None:
+    scope = {
+        "scope_id": "scope-a",
+        "target_draw_count": 10,
+        "target_draw_ids_sha256": "a" * 64,
+    }
     reports = [
         {
             "product": {"slug": "first"},
             "backtest": {
                 "status": "complete",
+                "target_scope": scope,
                 "comparison": {
                     "mean_hit_difference": 0.1,
                     "approximate_p_value": 0.01,
+                    "target_scope_id": "scope-a",
+                    "target_draw_count": 10,
                 },
                 "audit_comparison": {
                     "mean_hit_difference": 0.1,
                     "approximate_p_value": 0.04,
+                    "target_scope_id": "scope-a",
+                    "target_draw_count": 10,
                 },
             },
         },
@@ -223,13 +251,18 @@ def test_finalize_backtests_applies_global_bh_correction() -> None:
             "product": {"slug": "second"},
             "backtest": {
                 "status": "complete",
+                "target_scope": scope,
                 "comparison": {
                     "mean_position_match_difference": 0.1,
                     "approximate_p_value": 0.06,
+                    "target_scope_id": "scope-a",
+                    "target_draw_count": 10,
                 },
                 "audit_comparison": {
                     "mean_position_match_difference": -0.1,
                     "approximate_p_value": 0.001,
+                    "target_scope_id": "scope-a",
+                    "target_draw_count": 10,
                 },
             },
         },
@@ -238,6 +271,8 @@ def test_finalize_backtests_applies_global_bh_correction() -> None:
     summary = finalize_backtests(reports)
 
     assert summary["comparison_count"] == 4
+    assert summary["target_scope_validation"]["status"] == "validated"
+    assert summary["target_scope_validation"]["product_count"] == 2
     assert summary["unadjusted_winning_comparisons"] == 2
     assert summary["adjusted_winning_comparisons"] == 1
     assert summary["products_with_adjusted_win"] == ["first"]
@@ -245,6 +280,15 @@ def test_finalize_backtests_applies_global_bh_correction() -> None:
     assert reports[0]["backtest"]["comparison"]["beats_baseline"] is True
     assert reports[0]["backtest"]["audit_comparison"]["beats_baseline"] is False
     assert reports[1]["backtest"]["audit_comparison"]["beats_baseline"] is False
+
+
+def test_finalize_backtests_rejects_target_scope_mismatch() -> None:
+    report = build_backtest_report(_dataset(160))
+    broken = deepcopy(report)
+    broken["recent_comparison"]["target_scope_id"] = "different-scope"
+
+    with pytest.raises(ValueError, match="target_scope_id mismatch"):
+        finalize_backtests([{"product": {"slug": "mega645"}, "backtest": broken}])
 
 
 def test_prediction_report_prefers_newer_model_for_same_cutoff(tmp_path) -> None:
