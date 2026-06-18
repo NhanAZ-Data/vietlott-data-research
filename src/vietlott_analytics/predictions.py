@@ -15,7 +15,7 @@ from pathlib import Path
 from statistics import NormalDist, fmean, stdev
 from typing import Any
 
-from .catalog import AnalysisKind, AnalyticsProduct
+from .catalog import PRODUCTS, AnalysisKind, AnalyticsProduct
 from .io import Observation, ProductDataset
 
 MODEL_VERSION = "1.3.0"
@@ -186,6 +186,8 @@ class PredictionLedger:
         for (product, strategy), rows in sorted(performance.items()):
             exact_hits = sum(row["outcome"]["status"] == "exact" for row in rows)
             near_hits = sum(row["outcome"]["status"] == "near" for row in rows)
+            expected_exact = _expected_outcome_count(rows, "exact")
+            expected_near = _expected_outcome_count(rows, "near")
             partial_matches = sum(bool(row["outcome"]["has_partial_match"]) for row in rows)
             hit_counts = [
                 int(row["metrics"]["hit_count"])
@@ -206,6 +208,9 @@ class PredictionLedger:
                     "exact_hit_rate": _round(exact_hits / len(rows)),
                     "near_hits": near_hits,
                     "wrong": len(rows) - exact_hits - near_hits,
+                    "expected_exact_by_chance": _significant(expected_exact),
+                    "expected_near_by_chance": _significant(expected_near),
+                    "near_excess_vs_chance": _significant(near_hits - expected_near),
                     "partial_matches": partial_matches,
                     "average_hits": _round(fmean(hit_counts)) if hit_counts else None,
                     "average_best_position_matches": (
@@ -219,6 +224,8 @@ class PredictionLedger:
         for product, rows in sorted(product_performance.items()):
             product_exact = sum(row["outcome"]["status"] == "exact" for row in rows)
             product_near = sum(row["outcome"]["status"] == "near" for row in rows)
+            expected_exact = _expected_outcome_count(rows, "exact")
+            expected_near = _expected_outcome_count(rows, "near")
             product_partial = sum(
                 bool(row["outcome"]["has_partial_match"]) for row in rows
             )
@@ -234,6 +241,9 @@ class PredictionLedger:
                 "exact": product_exact,
                 "near": product_near,
                 "wrong": len(rows) - product_exact - product_near,
+                "expected_exact_by_chance": _significant(expected_exact),
+                "expected_near_by_chance": _significant(expected_near),
+                "near_excess_vs_chance": _significant(product_near - expected_near),
                 "partial_matches": product_partial,
                 "zero_matches": product_zero,
                 "score_kind": rows[0]["outcome"]["score_kind"],
@@ -251,6 +261,8 @@ class PredictionLedger:
             evaluation["outcome"]["status"] == "near"
             for evaluation in evaluation_details
         )
+        expected_exact = _expected_outcome_count(evaluation_details, "exact")
+        expected_near = _expected_outcome_count(evaluation_details, "near")
         partial_matches = sum(
             bool(evaluation["outcome"]["has_partial_match"])
             for evaluation in evaluation_details
@@ -304,6 +316,9 @@ class PredictionLedger:
                 "exact": exact_hits,
                 "near": near_hits,
                 "wrong": len(evaluation_details) - exact_hits - near_hits,
+                "expected_exact_by_chance": _significant(expected_exact),
+                "expected_near_by_chance": _significant(expected_near),
+                "near_excess_vs_chance": _significant(near_hits - expected_near),
                 "partial_matches": partial_matches,
                 "zero_matches": zero_matches,
                 "near_rule": (
@@ -393,7 +408,8 @@ def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
 def _forecast_events(dataset: ProductDataset) -> list[dict[str, Any]]:
     product = dataset.product
     latest = dataset.latest
-    generated_at = dataset.latest_fetched_at or f"{latest.draw_date.isoformat()}T00:00:00+00:00"
+    generated_at = datetime.now(UTC).replace(microsecond=0).isoformat()
+    dataset_observed_at = dataset.latest_fetched_at or f"{latest.draw_date.isoformat()}T00:00:00+00:00"
     fingerprint = dataset.history_fingerprint
     if product.kind is AnalysisKind.NUMBER_SET:
         forecasts = _number_forecasts(dataset)
@@ -421,6 +437,7 @@ def _forecast_events(dataset: ProductDataset) -> list[dict[str, Any]]:
                 "code_version": MODEL_VERSION,
                 "generated_at": generated_at,
                 "generated_at_timezone": "UTC",
+                "dataset_observed_at": dataset_observed_at,
                 "dataset_cutoff_draw_id": latest.draw_id,
                 "dataset_cutoff_date": latest.draw_date.isoformat(),
                 "dataset_cutoff_timezone": "Asia/Ho_Chi_Minh",
@@ -1369,6 +1386,7 @@ def _evaluation_detail(
     prediction: dict[str, Any],
     evaluation: dict[str, Any],
 ) -> dict[str, Any]:
+    product = PRODUCTS.get(str(prediction["product"]))
     metrics = evaluation["metrics"]
     predicted_result = prediction["prediction"]
     actual_result = evaluation["actual_result"]
@@ -1408,6 +1426,16 @@ def _evaluation_detail(
             "actual_only_numbers": sorted(actual_numbers - predicted_numbers),
             "matched_special_numbers": matched_special,
         }
+        baseline_probability = _number_outcome_probability(
+            product,
+            predicted_numbers=len(predicted_numbers),
+            actual_numbers=len(actual_numbers),
+            predicted_special=len(predicted_special),
+            actual_special=len(actual_special),
+            matched_units=matched_units,
+            score=score,
+            required_units=required_units,
+        )
     else:
         sequence = str(predicted_result.get("sequence", ""))
         outcomes = {str(value) for value in actual_result.get("outcomes", [])}
@@ -1431,6 +1459,12 @@ def _evaluation_detail(
             "best_matching_outcome": best_outcome,
             "matched_positions": matched_positions,
         }
+        baseline_probability = _digit_outcome_probability(
+            product,
+            outcomes=outcomes,
+            score=score,
+            required_units=required_units,
+        )
 
     status = "exact" if exact else "near" if near else "wrong"
     return {
@@ -1454,6 +1488,7 @@ def _evaluation_detail(
             "score_label": score_label,
             "matched_units": matched_units,
             "required_units": required_units,
+            "baseline_probability": baseline_probability,
             "has_partial_match": not exact and matched_units > 0,
             **comparison,
         },
@@ -1494,6 +1529,122 @@ def _score_distribution(rows: list[dict[str, Any]]) -> list[dict[str, int]]:
         for score in range(max(counts, default=0) + 1)
         if counts[score]
     ]
+
+
+def _expected_outcome_count(rows: list[dict[str, Any]], key: str) -> float:
+    return sum(
+        float(row["outcome"].get("baseline_probability", {}).get(key, 0.0))
+        for row in rows
+    )
+
+
+def _number_outcome_probability(
+    product: AnalyticsProduct | None,
+    *,
+    predicted_numbers: int,
+    actual_numbers: int,
+    predicted_special: int,
+    actual_special: int,
+    matched_units: int,
+    score: int,
+    required_units: int,
+) -> dict[str, object]:
+    if product is None or product.kind is not AnalysisKind.NUMBER_SET:
+        return _empty_probability("unknown")
+    main_distribution = _hypergeometric_match_distribution(
+        product.pool_size,
+        actual_numbers,
+        predicted_numbers,
+    )
+    if predicted_special:
+        special_pool_size = (
+            product.special_max - product.special_min + 1
+            if product.special_min is not None and product.special_max is not None
+            else product.pool_size
+        )
+        special_distribution = _hypergeometric_match_distribution(
+            special_pool_size,
+            actual_special,
+            predicted_special,
+        )
+    else:
+        special_distribution = {0: 1.0}
+
+    combined: dict[int, float] = defaultdict(float)
+    for main_hits, main_probability in main_distribution.items():
+        for special_hits, special_probability in special_distribution.items():
+            combined[main_hits + special_hits] += main_probability * special_probability
+
+    near_units = required_units - 1
+    return {
+        "model": "uniform_same_ticket_shape",
+        "score_basis": "main_numbers",
+        "exact": _significant(combined.get(required_units, 0.0)),
+        "near": _significant(combined.get(near_units, 0.0) if near_units >= 0 else 0.0),
+        "matched_units": _significant(combined.get(matched_units, 0.0)),
+        "score": _significant(main_distribution.get(score, 0.0)),
+    }
+
+
+def _digit_outcome_probability(
+    product: AnalyticsProduct | None,
+    *,
+    outcomes: set[str],
+    score: int,
+    required_units: int,
+) -> dict[str, object]:
+    if product is None or product.kind is not AnalysisKind.DIGIT_SEQUENCE:
+        return _empty_probability("unknown")
+    symbols = list(range(product.sequence_min, product.sequence_max + 1))
+    length = product.sequence_length or required_units
+    _, exact_probability, score_distribution = _digit_uniform_expectation(
+        outcomes,
+        symbols,
+        length,
+    )
+    near_score = required_units - 1
+    return {
+        "model": "uniform_sequence_enumeration",
+        "score_basis": "best_position_matches",
+        "candidate_space_size": len(symbols) ** length,
+        "actual_outcomes": len(outcomes),
+        "exact": _significant(exact_probability),
+        "near": _significant(
+            score_distribution.get(near_score, 0.0) if near_score >= 0 else 0.0
+        ),
+        "matched_units": _significant(score_distribution.get(score, 0.0)),
+        "score": _significant(score_distribution.get(score, 0.0)),
+    }
+
+
+def _hypergeometric_match_distribution(
+    pool_size: int,
+    actual_successes: int,
+    picks: int,
+) -> dict[int, float]:
+    if pool_size <= 0 or picks < 0 or actual_successes < 0 or picks > pool_size:
+        return {}
+    denominator = math.comb(pool_size, picks)
+    minimum_hits = max(0, picks - (pool_size - actual_successes))
+    maximum_hits = min(picks, actual_successes)
+    return {
+        hits: (
+            math.comb(actual_successes, hits)
+            * math.comb(pool_size - actual_successes, picks - hits)
+            / denominator
+        )
+        for hits in range(minimum_hits, maximum_hits + 1)
+    }
+
+
+def _empty_probability(model: str) -> dict[str, object]:
+    return {
+        "model": model,
+        "exact": 0.0,
+        "near": 0.0,
+        "matched_units": 0.0,
+        "score": 0.0,
+    }
 
 
 def _best_position_match(prediction: str, outcomes: set[str]) -> int:
@@ -1700,6 +1851,10 @@ def _seed_int(seed: str) -> int:
 
 def _round(value: float, digits: int = 6) -> float:
     return round(float(value), digits)
+
+
+def _significant(value: float, digits: int = 12) -> float:
+    return float(f"{float(value):.{digits}g}")
 
 
 def _event_hash(event: dict[str, Any]) -> str:

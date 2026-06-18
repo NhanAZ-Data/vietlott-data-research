@@ -2898,7 +2898,7 @@ a {
 
 .prediction-product-metrics {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 1px;
   overflow: hidden;
   border-radius: 16px;
@@ -2916,8 +2916,16 @@ a {
   text-align: left;
 }
 
-.prediction-product-metric:hover,
-.prediction-product-metric:focus-visible {
+.prediction-product-metric.static {
+  cursor: default;
+}
+
+.prediction-product-metric.static strong {
+  color: var(--paper);
+}
+
+button.prediction-product-metric:hover,
+button.prediction-product-metric:focus-visible {
   background: #1c4240;
   outline: 2px solid rgb(212 255 91 / 54%);
   outline-offset: -2px;

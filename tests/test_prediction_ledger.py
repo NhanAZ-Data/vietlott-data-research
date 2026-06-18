@@ -340,34 +340,33 @@ def test_prediction_report_uses_strict_exact_and_near_rules(tmp_path) -> None:
 
     report = PredictionLedger(path=tmp_path / "ledger.jsonl", events=events).site_report()
 
-    assert report["outcome_summary"] == {
-        "evaluated_draws": 3,
-        "evaluated_predictions": 3,
-        "exact": 1,
-        "near": 1,
-        "wrong": 1,
-        "partial_matches": 2,
-        "zero_matches": 0,
-        "near_rule": (
-            "Gần đúng chỉ khi thiếu đúng một số hoặc một vị trí so với kết quả "
-            "đầy đủ. Trùng ít hơn vẫn được ghi số lượng nhưng tính là sai."
-        ),
-    }
-    assert report["product_outcomes"]["mega645"] == {
-        "evaluated_draws": 3,
-        "evaluated_predictions": 3,
-        "exact": 1,
-        "near": 1,
-        "wrong": 1,
-        "partial_matches": 2,
-        "zero_matches": 0,
-        "score_kind": "numbers",
-        "score_distribution": [
-            {"score": 1, "count": 1},
-            {"score": 5, "count": 1},
-            {"score": 6, "count": 1},
-        ],
-    }
+    summary = report["outcome_summary"]
+    assert summary["evaluated_draws"] == 3
+    assert summary["evaluated_predictions"] == 3
+    assert summary["exact"] == 1
+    assert summary["near"] == 1
+    assert summary["wrong"] == 1
+    assert summary["partial_matches"] == 2
+    assert summary["zero_matches"] == 0
+    assert summary["expected_exact_by_chance"] > 0
+    assert summary["expected_near_by_chance"] > summary["expected_exact_by_chance"]
+    assert summary["near_excess_vs_chance"] > 0
+
+    product_outcome = report["product_outcomes"]["mega645"]
+    assert product_outcome["evaluated_draws"] == 3
+    assert product_outcome["evaluated_predictions"] == 3
+    assert product_outcome["exact"] == 1
+    assert product_outcome["near"] == 1
+    assert product_outcome["wrong"] == 1
+    assert product_outcome["partial_matches"] == 2
+    assert product_outcome["zero_matches"] == 0
+    assert product_outcome["score_kind"] == "numbers"
+    assert product_outcome["expected_near_by_chance"] == summary["expected_near_by_chance"]
+    assert product_outcome["score_distribution"] == [
+        {"score": 1, "count": 1},
+        {"score": 5, "count": 1},
+        {"score": 6, "count": 1},
+    ]
     statuses = {
         evaluation["prediction_id"]: evaluation["outcome"]["status"]
         for evaluation in report["recent_evaluations"]
@@ -378,3 +377,81 @@ def test_prediction_report_uses_strict_exact_and_near_rules(tmp_path) -> None:
         "prediction-1": "near",
         "prediction-2": "wrong",
     }
+    near_row = next(
+        evaluation
+        for evaluation in report["recent_evaluations"]
+        if evaluation["outcome"]["status"] == "near"
+    )
+    assert (
+        near_row["outcome"]["baseline_probability"]["near"]
+        > near_row["outcome"]["baseline_probability"]["exact"]
+    )
+
+
+def test_digit_near_probability_accounts_for_multiple_prize_outcomes(tmp_path) -> None:
+    outcomes = [
+        "312",
+        "097",
+        "756",
+        "585",
+        "958",
+        "008",
+        "795",
+        "713",
+        "998",
+        "953",
+        "307",
+        "449",
+        "849",
+        "207",
+        "137",
+        "038",
+        "017",
+        "198",
+        "436",
+        "401",
+    ]
+    prediction = {
+        "event_type": "prediction",
+        "prediction_id": "max3dpro-prediction",
+        "product": "max3dpro",
+        "strategy": "balanced_signal",
+        "strategy_label": "balanced",
+        "model_version": "1.3.0",
+        "generated_at": "2026-06-13T19:25:04+00:00",
+        "dataset_cutoff_draw_id": "00739",
+        "dataset_cutoff_date": "2026-06-13",
+        "dataset_fingerprint": "frozen",
+        "prediction": {"sequence": "015"},
+        "parameters": {"sequence_length": 3},
+    }
+    evaluation = {
+        "event_type": "evaluation",
+        "evaluation_id": "max3dpro-evaluation",
+        "prediction_id": "max3dpro-prediction",
+        "product": "max3dpro",
+        "strategy": "balanced_signal",
+        "model_version": "1.3.0",
+        "evaluated_at": "2026-06-16T11:32:02+00:00",
+        "actual_draw_id": "00740",
+        "actual_draw_date": "2026-06-16",
+        "actual_result": {"outcomes": outcomes},
+        "metrics": {
+            "exact_hit": False,
+            "best_position_matches": 2,
+        },
+    }
+
+    report = PredictionLedger(
+        path=tmp_path / "ledger.jsonl",
+        events=[prediction, evaluation],
+    ).site_report()
+
+    [row] = report["recent_evaluations"]
+    baseline = row["outcome"]["baseline_probability"]
+    assert row["outcome"]["status"] == "near"
+    assert baseline["actual_outcomes"] == 20
+    assert baseline["candidate_space_size"] == 1000
+    assert baseline["exact"] == 0.02
+    assert baseline["near"] == 0.401
+    assert report["product_outcomes"]["max3dpro"]["expected_near_by_chance"] == 0.401

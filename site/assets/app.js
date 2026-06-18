@@ -1463,6 +1463,8 @@ function renderRecentDraws(draws, kind) {
 function renderPredictionShell(predictions, products) {
   const outcome = predictions.outcome_summary || {};
   const integrity = predictions.ledger_integrity || {};
+  const expectedNear = Number(outcome.expected_near_by_chance || 0);
+  const nearExcess = Number(outcome.near_excess_vs_chance || 0);
   text("pending-predictions", numberFormatter.format(predictions.pending_count));
   text("exact-predictions", numberFormatter.format(outcome.exact || 0));
   text("near-predictions", numberFormatter.format(outcome.near || 0));
@@ -1475,7 +1477,7 @@ function renderPredictionShell(predictions, products) {
   text("archive-partial-matches", numberFormatter.format(outcome.partial_matches || 0));
   text(
     "prediction-near-rule",
-    `${outcome.near_rule || ""} ${numberFormatter.format(predictions.evaluation_count)} lượt dự đoán hiện thuộc ${numberFormatter.format(outcome.evaluated_draws || 0)} kỳ quay thực tế.`,
+    `${outcome.near_rule || ""} ${numberFormatter.format(predictions.evaluation_count)} lượt dự đoán hiện thuộc ${numberFormatter.format(outcome.evaluated_draws || 0)} kỳ quay thực tế. Nếu chọn ngẫu nhiên theo cùng luật chấm, kỳ vọng gần đúng khoảng ${formatExpectedCount(expectedNear)} lượt; thực tế ${formatExpectedCount(outcome.near || 0)} lượt, chênh ${formatSignedExpected(nearExcess)}.`,
   );
   text("prediction-current-conclusion", predictionOutcomeConclusion());
   text(
@@ -1649,6 +1651,8 @@ function renderPredictionResults(slug) {
   const near = Number(productOutcome.near || 0);
   const wrong = Number(productOutcome.wrong || 0);
   const partial = Number(productOutcome.partial_matches || 0);
+  const expectedNear = Number(productOutcome.expected_near_by_chance || 0);
+  const nearExcess = Number(productOutcome.near_excess_vs_chance || 0);
   const evaluatedDraws = Number(productOutcome.evaluated_draws || 0);
   const evaluatedPredictions = Number(
     productOutcome.evaluated_predictions || evaluations.length,
@@ -1665,6 +1669,8 @@ function renderPredictionResults(slug) {
       <button class="prediction-product-metric" type="button" data-product-filter="evaluated-predictions" aria-controls="prediction-history-list"><span>Lượt dự đoán</span><strong>${numberFormatter.format(evaluatedPredictions)}</strong></button>
       <button class="prediction-product-metric" type="button" data-product-filter="exact" aria-controls="prediction-history-list"><span>Đúng toàn bộ</span><strong>${numberFormatter.format(exact)}</strong></button>
       <button class="prediction-product-metric" type="button" data-product-filter="near" aria-controls="prediction-history-list"><span>Gần đúng</span><strong>${numberFormatter.format(near)}</strong></button>
+      <div class="prediction-product-metric static"><span>Kỳ vọng gần đúng</span><strong>${formatExpectedCount(expectedNear)}</strong></div>
+      <div class="prediction-product-metric static"><span>Chênh so với nền</span><strong>${formatSignedExpected(nearExcess)}</strong></div>
       <button class="prediction-product-metric" type="button" data-product-filter="wrong" aria-controls="prediction-history-list"><span>Sai</span><strong>${numberFormatter.format(wrong)}</strong></button>
       <button class="prediction-product-metric" type="button" data-product-filter="partial" aria-controls="prediction-history-list"><span>Có trùng một phần</span><strong>${numberFormatter.format(partial)}</strong></button>
     </div>
@@ -1864,6 +1870,7 @@ function renderPredictionEvaluation(evaluation, options = {}) {
       </div>
       <footer>
         <strong>${escapeHtml(evaluation.outcome.score_label)}</strong>
+        <span>${escapeHtml(evaluationBaselineLabel(evaluation))}</span>
         <span>Dữ liệu đã khóa ở kỳ #${escapeHtml(evaluation.dataset_cutoff_draw_id)}</span>
         <span>Mã lưu vết ${escapeHtml(evaluation.prediction_id)}</span>
       </footer>
@@ -2041,12 +2048,45 @@ function formatSigned(value, digits = 2) {
   return `${number >= 0 ? "+" : ""}${formatDecimal(number, digits)}`;
 }
 
+function formatSignedExpected(value) {
+  const number = Number(value || 0);
+  if (number !== 0 && Math.abs(number) < 0.001) {
+    return `${number >= 0 ? "+" : ""}${number.toExponential(2).replace(".", ",")}`;
+  }
+  return formatSigned(number, Math.abs(number) < 10 ? 2 : 1);
+}
+
+function formatExpectedCount(value) {
+  const number = Number(value || 0);
+  if (number !== 0 && Math.abs(number) < 0.001) {
+    return number.toExponential(2).replace(".", ",");
+  }
+  return formatDecimal(number, number < 10 ? 2 : 1);
+}
+
 function formatPercent(value, digits = 1) {
   return Number(value).toLocaleString("vi-VN", {
     style: "percent",
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,
   });
+}
+
+function formatProbability(value) {
+  const number = Number(value || 0);
+  if (number !== 0 && Math.abs(number) < 0.000001) {
+    return number.toExponential(2).replace(".", ",");
+  }
+  return formatPercent(number, number < 0.01 ? 4 : 1);
+}
+
+function evaluationBaselineLabel(evaluation) {
+  const baseline = evaluation.outcome?.baseline_probability;
+  if (!baseline) return "Chưa có xác suất nền";
+  const suffix = baseline.actual_outcomes > 1
+    ? `, ${numberFormatter.format(baseline.actual_outcomes)} dòng giải`
+    : "";
+  return `Nền ngẫu nhiên: gần đúng ${formatProbability(baseline.near)}, đúng ${formatProbability(baseline.exact)}${suffix}`;
 }
 
 function formatPValue(value) {
