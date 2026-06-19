@@ -133,6 +133,10 @@ BACKTEST_WINDOW_SENSITIVITY_STRATEGIES = (
         "label": "Tín hiệu kiểm định công bằng",
     },
 )
+BACKTEST_BLOCK_BOOTSTRAP_RESAMPLES = 199
+BACKTEST_BLOCK_BOOTSTRAP_MIN_VALUES = 30
+BACKTEST_BLOCK_BOOTSTRAP_MAX_VALUES = 2500
+BACKTEST_BLOCK_BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BACKTEST_COMMON_REJECTED_CONFIGURATIONS = (
     {
         "config_id": "posthoc_best_variant_picker",
@@ -511,6 +515,7 @@ def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
     phase_splits: list[dict[str, Any]] = []
     trial_registries: list[dict[str, Any]] = []
     window_sensitivity_reports: list[dict[str, Any]] = []
+    block_bootstrap_reports: list[dict[str, Any]] = []
     completed_backtests: list[tuple[str, dict[str, Any]]] = []
     completed_products = 0
     for report in product_reports:
@@ -522,6 +527,8 @@ def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
         _validate_backtest_multiple_testing_trials(backtest)
         if "window_sensitivity" in backtest:
             _validate_backtest_window_sensitivity(backtest)
+        if _backtest_has_block_bootstrap_checks(backtest):
+            _validate_backtest_block_bootstrap_checks(backtest)
         _validate_backtest_trial_disposition_log(backtest)
         completed_products += 1
         product_slug = str(report["product"]["slug"])
@@ -597,6 +604,10 @@ def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
                     if isinstance(target_scope, dict)
                     else None,
                 }
+            )
+        if _backtest_has_block_bootstrap_checks(backtest):
+            block_bootstrap_reports.append(
+                _backtest_block_bootstrap_summary(product_slug, backtest)
             )
         phase_split = backtest.get("phase_split")
         if isinstance(phase_split, dict):
@@ -767,6 +778,34 @@ def finalize_backtests(product_reports: list[dict[str, Any]]) -> dict[str, Any]:
                 "và cùng đi vào hiệu chỉnh Benjamini-Hochberg."
             ),
         },
+        "block_bootstrap_validation": {
+            "status": "validated",
+            "method": "moving_block_bootstrap",
+            "product_count": len(block_bootstrap_reports),
+            "resamples": BACKTEST_BLOCK_BOOTSTRAP_RESAMPLES,
+            "confidence_level": BACKTEST_BLOCK_BOOTSTRAP_CONFIDENCE_LEVEL,
+            "comparison_check_count": sum(
+                int(row.get("comparison_check_count") or 0)
+                for row in block_bootstrap_reports
+            ),
+            "trial_check_count": sum(
+                int(row.get("trial_check_count") or 0)
+                for row in block_bootstrap_reports
+            ),
+            "available_check_count": sum(
+                int(row.get("available_check_count") or 0)
+                for row in block_bootstrap_reports
+            ),
+            "normal_overlap_count": sum(
+                int(row.get("normal_overlap_count") or 0)
+                for row in block_bootstrap_reports
+            ),
+            "products": block_bootstrap_reports,
+            "interpretation": (
+                "Block bootstrap resample các kỳ liên tiếp để so sánh khoảng bất "
+                "định với xấp xỉ chuẩn hiện tại; chẩn đoán này không đổi p/q/status."
+            ),
+        },
         "target_scope_validation": {
             "status": "validated",
             "method": "shared_target_scope_id_per_product",
@@ -914,6 +953,7 @@ def _backtest_trial_row(
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     z_score, p_value = _paired_normal_test(differences)
+    normal_interval = _normal_mean_interval(differences)
     row = {
         "trial_id": trial_id,
         "strategy": strategy,
@@ -925,7 +965,12 @@ def _backtest_trial_row(
         metric_key: _round(fmean(differences)),
         "paired_z_score": _round(z_score),
         "approximate_p_value": _round(p_value, 8),
-        **_normal_mean_interval(differences),
+        **normal_interval,
+        "block_bootstrap_check": _backtest_block_bootstrap_check(
+            test_id=trial_id,
+            differences=differences,
+            metric_key=metric_key,
+        ),
         "parameters": parameters,
     }
     if metadata:
@@ -1515,6 +1560,137 @@ def _validate_backtest_window_sensitivity(backtest: dict[str, Any]) -> None:
         raise ValueError("Backtest window_sensitivity primary summary mismatch")
     if sensitivity.get("alternative_window_trial_count") != alternative_count:
         raise ValueError("Backtest window_sensitivity alternative summary mismatch")
+
+
+def _backtest_has_block_bootstrap_checks(backtest: dict[str, Any]) -> bool:
+    if any(
+        isinstance(backtest.get(key), dict)
+        and "block_bootstrap_check" in backtest[key]
+        for key in BACKTEST_COMPARISON_KEYS
+    ):
+        return True
+    registry = backtest.get("multiple_testing_trials")
+    trials = registry.get("trials", []) if isinstance(registry, dict) else []
+    return any(
+        isinstance(trial, dict) and "block_bootstrap_check" in trial
+        for trial in trials
+    )
+
+
+def _validate_backtest_block_bootstrap_checks(backtest: dict[str, Any]) -> None:
+    registry = backtest.get("multiple_testing_trials")
+    target_scope = backtest.get("target_scope")
+    if not isinstance(registry, dict):
+        raise ValueError("Backtest multiple_testing_trials missing")
+    if not isinstance(target_scope, dict):
+        raise ValueError("Backtest target_scope missing")
+    trials = registry.get("trials")
+    if not isinstance(trials, list) or not trials:
+        raise ValueError("Backtest multiple_testing_trials empty")
+    expected_count = target_scope.get("target_draw_count")
+    if expected_count is not None and expected_count >= BACKTEST_BLOCK_BOOTSTRAP_MIN_VALUES:
+        expected_status = "available"
+    else:
+        expected_status = "not_available"
+    for key in BACKTEST_COMPARISON_KEYS:
+        row = backtest.get(key)
+        if isinstance(row, dict):
+            _validate_backtest_block_bootstrap_check(
+                row.get("block_bootstrap_check"),
+                expected_status,
+            )
+    for trial in trials:
+        if not isinstance(trial, dict):
+            raise ValueError("Backtest multiple_testing_trials row invalid")
+        _validate_backtest_block_bootstrap_check(
+            trial.get("block_bootstrap_check"),
+            expected_status,
+        )
+
+
+def _validate_backtest_block_bootstrap_check(
+    check: Any,
+    expected_status: str,
+) -> None:
+    if not isinstance(check, dict):
+        raise ValueError("Backtest block_bootstrap_check missing")
+    if check.get("method") != "moving_block_bootstrap":
+        raise ValueError("Backtest block_bootstrap_check method mismatch")
+    if check.get("no_multiple_testing_decision") is not True:
+        raise ValueError("Backtest block_bootstrap_check decision flag mismatch")
+    if check.get("status") != expected_status:
+        raise ValueError("Backtest block_bootstrap_check status mismatch")
+    if expected_status != "available":
+        return
+    if check.get("resamples") != BACKTEST_BLOCK_BOOTSTRAP_RESAMPLES:
+        raise ValueError("Backtest block_bootstrap_check resamples mismatch")
+    if check.get("preserve_time_structure") != "contiguous_observation_blocks":
+        raise ValueError("Backtest block_bootstrap_check preserve policy mismatch")
+    if not isinstance(check.get("seed"), str) or len(str(check.get("seed"))) != 16:
+        raise ValueError("Backtest block_bootstrap_check seed invalid")
+    if not isinstance(check.get("block_length"), int):
+        raise ValueError("Backtest block_bootstrap_check block length missing")
+    if not isinstance(check.get("confidence_interval_lower"), (int, float)):
+        raise ValueError("Backtest block_bootstrap_check interval missing")
+    if not isinstance(check.get("confidence_interval_upper"), (int, float)):
+        raise ValueError("Backtest block_bootstrap_check interval missing")
+    if check["confidence_interval_lower"] > check["confidence_interval_upper"]:
+        raise ValueError("Backtest block_bootstrap_check interval invalid")
+    normal = check.get("normal_approximation")
+    if not isinstance(normal, dict):
+        raise ValueError("Backtest block_bootstrap_check normal comparison missing")
+    if normal.get("method") != "paired_normal_mean_interval":
+        raise ValueError("Backtest block_bootstrap_check normal method mismatch")
+    if not isinstance(normal.get("confidence_interval_lower"), (int, float)):
+        raise ValueError("Backtest block_bootstrap_check normal interval missing")
+    if not isinstance(normal.get("confidence_interval_upper"), (int, float)):
+        raise ValueError("Backtest block_bootstrap_check normal interval missing")
+
+
+def _backtest_block_bootstrap_summary(
+    product_slug: str,
+    backtest: dict[str, Any],
+) -> dict[str, Any]:
+    comparison_checks = [
+        backtest[key]["block_bootstrap_check"]
+        for key in BACKTEST_COMPARISON_KEYS
+        if isinstance(backtest.get(key), dict)
+        and isinstance(backtest[key].get("block_bootstrap_check"), dict)
+    ]
+    registry = backtest.get("multiple_testing_trials", {})
+    trials = registry.get("trials", []) if isinstance(registry, dict) else []
+    trial_checks = [
+        trial["block_bootstrap_check"]
+        for trial in trials
+        if isinstance(trial, dict)
+        and isinstance(trial.get("block_bootstrap_check"), dict)
+    ]
+    checks = [*comparison_checks, *trial_checks]
+    available_checks = [
+        check for check in checks if check.get("status") == "available"
+    ]
+    return {
+        "product": product_slug,
+        "method": "moving_block_bootstrap",
+        "comparison_check_count": len(comparison_checks),
+        "trial_check_count": len(trial_checks),
+        "available_check_count": len(available_checks),
+        "normal_overlap_count": sum(
+            bool(check.get("interval_overlap_with_normal_approximation"))
+            for check in available_checks
+        ),
+        "max_block_length": max(
+            (int(check.get("block_length") or 0) for check in available_checks),
+            default=0,
+        ),
+        "sampling_methods": sorted(
+            {
+                str(check.get("sampling_method"))
+                for check in available_checks
+                if check.get("sampling_method")
+            }
+        ),
+    }
 
 
 def _validate_backtest_trial_disposition_log(backtest: dict[str, Any]) -> None:
@@ -2198,6 +2374,11 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "paired_z_score": _round(z_score),
             "approximate_p_value": _round(p_value, 8),
             **difference_interval,
+            "block_bootstrap_check": _backtest_block_bootstrap_check(
+                test_id="balanced_signal:published_final",
+                differences=evaluation_differences,
+                metric_key="mean_hit_difference",
+            ),
             "beats_baseline_unadjusted": comparison_wins,
             "beats_baseline": False,
         },
@@ -2207,6 +2388,11 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "paired_z_score": _round(recent_z_score),
             "approximate_p_value": _round(recent_p_value, 8),
             **recent_difference_interval,
+            "block_bootstrap_check": _backtest_block_bootstrap_check(
+                test_id="recent_frequency:published_final",
+                differences=evaluation_recent_differences,
+                metric_key="mean_hit_difference",
+            ),
             "beats_baseline_unadjusted": recent_comparison_wins,
             "beats_baseline": False,
         },
@@ -2216,6 +2402,11 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
             "paired_z_score": _round(audit_z_score),
             "approximate_p_value": _round(audit_p_value, 8),
             **audit_difference_interval,
+            "block_bootstrap_check": _backtest_block_bootstrap_check(
+                test_id="audit_signal:published_final",
+                differences=evaluation_audit_differences,
+                metric_key="mean_hit_difference",
+            ),
             "beats_baseline_unadjusted": audit_comparison_wins,
             "beats_baseline": False,
         },
@@ -2229,6 +2420,7 @@ def _number_backtest(dataset: ProductDataset) -> dict[str, object]:
     _validate_backtest_phase_split(report)
     _validate_backtest_multiple_testing_trials(report)
     _validate_backtest_window_sensitivity(report)
+    _validate_backtest_block_bootstrap_checks(report)
     _validate_backtest_trial_disposition_log(report)
     return report
 
@@ -2634,6 +2826,11 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             "paired_z_score": _round(z_score),
             "approximate_p_value": _round(p_value, 8),
             **difference_interval,
+            "block_bootstrap_check": _backtest_block_bootstrap_check(
+                test_id="balanced_signal:published_final",
+                differences=differences,
+                metric_key="mean_position_match_difference",
+            ),
             "beats_baseline_unadjusted": comparison_wins,
             "beats_baseline": False,
         },
@@ -2645,6 +2842,11 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             "paired_z_score": _round(recent_z_score),
             "approximate_p_value": _round(recent_p_value, 8),
             **recent_difference_interval,
+            "block_bootstrap_check": _backtest_block_bootstrap_check(
+                test_id="recent_frequency:published_final",
+                differences=recent_differences,
+                metric_key="mean_position_match_difference",
+            ),
             "beats_baseline_unadjusted": recent_comparison_wins,
             "beats_baseline": False,
         },
@@ -2654,6 +2856,11 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
             "paired_z_score": _round(audit_z_score),
             "approximate_p_value": _round(audit_p_value, 8),
             **audit_difference_interval,
+            "block_bootstrap_check": _backtest_block_bootstrap_check(
+                test_id="audit_signal:published_final",
+                differences=audit_differences,
+                metric_key="mean_position_match_difference",
+            ),
             "beats_baseline_unadjusted": audit_comparison_wins,
             "beats_baseline": False,
         },
@@ -2667,6 +2874,7 @@ def _digit_backtest(dataset: ProductDataset) -> dict[str, object]:
     _validate_backtest_phase_split(report)
     _validate_backtest_multiple_testing_trials(report)
     _validate_backtest_window_sensitivity(report)
+    _validate_backtest_block_bootstrap_checks(report)
     _validate_backtest_trial_disposition_log(report)
     return report
 
@@ -3389,6 +3597,132 @@ def _normal_mean_interval(differences: list[float]) -> dict[str, float]:
         "confidence_interval_lower": _round(mean_difference - margin),
         "confidence_interval_upper": _round(mean_difference + margin),
     }
+
+
+def _backtest_block_bootstrap_check(
+    *,
+    test_id: str,
+    differences: list[float],
+    metric_key: str,
+) -> dict[str, Any]:
+    full_count = len(differences)
+    if full_count < BACKTEST_BLOCK_BOOTSTRAP_MIN_VALUES:
+        return {
+            "status": "not_available",
+            "method": "moving_block_bootstrap",
+            "reason": "Không đủ kỳ đánh giá cuối để chạy block bootstrap đã khóa.",
+            "minimum_values": BACKTEST_BLOCK_BOOTSTRAP_MIN_VALUES,
+            "full_value_count": full_count,
+            "no_multiple_testing_decision": True,
+        }
+
+    sampled_values, sampling_method = _backtest_bootstrap_sample_values(
+        differences,
+        BACKTEST_BLOCK_BOOTSTRAP_MAX_VALUES,
+    )
+    block_length = _backtest_block_bootstrap_length(len(sampled_values))
+    starts = list(range(0, max(1, len(sampled_values) - block_length + 1)))
+    seed_hex, _values_hash = _backtest_diagnostic_seed(
+        test_id=test_id,
+        values=differences,
+        method_version="backtest-block-bootstrap-v1",
+    )
+    rng = random.Random(int(seed_hex, 16))
+    statistics: list[float] = []
+    for _ in range(BACKTEST_BLOCK_BOOTSTRAP_RESAMPLES):
+        bootstrapped: list[float] = []
+        while len(bootstrapped) < len(sampled_values):
+            start = rng.choice(starts)
+            bootstrapped.extend(sampled_values[start : start + block_length])
+        statistics.append(fmean(bootstrapped[: len(sampled_values)]))
+
+    ordered = sorted(statistics)
+    alpha = 1 - BACKTEST_BLOCK_BOOTSTRAP_CONFIDENCE_LEVEL
+    lower = _percentile(ordered, alpha / 2)
+    upper = _percentile(ordered, 1 - alpha / 2)
+    normal = _normal_mean_interval(sampled_values)
+    normal_lower = float(normal["confidence_interval_lower"])
+    normal_upper = float(normal["confidence_interval_upper"])
+    return {
+        "status": "available",
+        "method": "moving_block_bootstrap",
+        "resamples": BACKTEST_BLOCK_BOOTSTRAP_RESAMPLES,
+        "seed": seed_hex,
+        "statistic_name": metric_key,
+        "observed_statistic": _round(fmean(sampled_values)),
+        "bootstrap_mean": _round(fmean(statistics)),
+        "confidence_level": BACKTEST_BLOCK_BOOTSTRAP_CONFIDENCE_LEVEL,
+        "confidence_interval_lower": _round(lower),
+        "confidence_interval_upper": _round(upper),
+        "block_length": block_length,
+        "full_value_count": full_count,
+        "bootstrap_value_count": len(sampled_values),
+        "sampling_method": sampling_method,
+        "preserve_time_structure": "contiguous_observation_blocks",
+        "normal_approximation": {
+            "method": "paired_normal_mean_interval",
+            "confidence_level": normal["confidence_level"],
+            "standard_error": normal["standard_error"],
+            "confidence_interval_lower": normal["confidence_interval_lower"],
+            "confidence_interval_upper": normal["confidence_interval_upper"],
+        },
+        "interval_overlap_with_normal_approximation": (
+            max(float(lower), normal_lower) <= min(float(upper), normal_upper)
+        ),
+        "no_multiple_testing_decision": True,
+        "interpretation": (
+            "Block bootstrap resample các đoạn kỳ liên tiếp để kiểm tra độ bền của "
+            "khoảng chuẩn; chẩn đoán này không đổi p/q/status chính."
+        ),
+    }
+
+
+def _backtest_bootstrap_sample_values(
+    values: list[float],
+    max_values: int,
+) -> tuple[list[float], str]:
+    if len(values) <= max_values:
+        return list(values), "full_sequence"
+    step = len(values) / max_values
+    sampled = [
+        values[min(len(values) - 1, int(index * step))]
+        for index in range(max_values)
+    ]
+    return sampled, "deterministic_even_spacing"
+
+
+def _backtest_diagnostic_seed(
+    *,
+    test_id: str,
+    values: list[float],
+    method_version: str,
+) -> tuple[str, str]:
+    value_text = json.dumps(
+        [_round(value, 12) for value in values],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    values_hash = hashlib.sha256(value_text.encode()).hexdigest()
+    seed_hex = hashlib.sha256(
+        f"{test_id}:{len(values)}:{values_hash}:{method_version}".encode()
+    ).hexdigest()[:16]
+    return seed_hex, values_hash
+
+
+def _backtest_block_bootstrap_length(value_count: int) -> int:
+    return max(4, min(50, round(math.sqrt(value_count))))
+
+
+def _percentile(sorted_values: list[float], probability: float) -> float:
+    if not sorted_values:
+        return 0.0
+    position = (len(sorted_values) - 1) * max(0.0, min(1.0, probability))
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+    if lower_index == upper_index:
+        return sorted_values[lower_index]
+    fraction = position - lower_index
+    return sorted_values[lower_index] * (1 - fraction) + sorted_values[upper_index] * fraction
 
 
 def _number_partial_match_baseline(

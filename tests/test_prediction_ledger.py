@@ -258,6 +258,21 @@ def test_walk_forward_backtest_reports_uniform_baseline() -> None:
     assert {
         row["trial_id"] for row in window_sensitivity["trials"]
     }.issubset({row["trial_id"] for row in trial_registry["trials"]})
+    bootstrap = report["comparison"]["block_bootstrap_check"]
+    assert bootstrap["status"] == "available"
+    assert bootstrap["method"] == "moving_block_bootstrap"
+    assert bootstrap["resamples"] == 199
+    assert len(bootstrap["seed"]) == 16
+    assert bootstrap["preserve_time_structure"] == "contiguous_observation_blocks"
+    assert bootstrap["no_multiple_testing_decision"] is True
+    assert bootstrap["normal_approximation"]["method"] == "paired_normal_mean_interval"
+    assert bootstrap["confidence_interval_lower"] <= bootstrap["confidence_interval_upper"]
+    assert all(
+        row["block_bootstrap_check"]["status"] == "available"
+        and row["block_bootstrap_check"]["normal_approximation"]["method"]
+        == "paired_normal_mean_interval"
+        for row in trial_registry["trials"]
+    )
     trial_log = report["trial_disposition_log"]
     assert trial_log["method"] == "registered_trial_disposition_log"
     assert trial_log["included_trial_count"] == trial_registry["trial_count"]
@@ -492,6 +507,11 @@ def test_digit_walk_forward_backtest_reports_digit_score_formula() -> None:
     assert window_sensitivity["trial_count"] == 9
     assert window_sensitivity["primary_trial_count"] == 3
     assert window_sensitivity["alternative_window_trial_count"] == 6
+    bootstrap = report["comparison"]["block_bootstrap_check"]
+    assert bootstrap["status"] == "available"
+    assert bootstrap["method"] == "moving_block_bootstrap"
+    assert bootstrap["resamples"] == 199
+    assert bootstrap["normal_approximation"]["method"] == "paired_normal_mean_interval"
     trial_log = report["trial_disposition_log"]
     assert trial_log["included_trial_count"] == 13
     assert trial_log["failed_trial_count"] == 13

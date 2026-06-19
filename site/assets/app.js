@@ -1661,6 +1661,7 @@ function renderBacktest(backtest, kind) {
   const windowSensitivityDescription = renderBacktestWindowSensitivity(
     backtest.window_sensitivity,
   );
+  const blockBootstrapDescription = renderBacktestBlockBootstrap(backtest);
   const multipleTestingDescription = renderBacktestMultipleTestingScope(backtest);
   const trialDispositionDescription = renderBacktestTrialDisposition(
     backtest.trial_disposition_log,
@@ -1716,6 +1717,7 @@ function renderBacktest(backtest, kind) {
           ${scoreDescription}
           <li><strong>Baseline đồng đều chính xác</strong><span>Với tập số, kỳ vọng và phân bố số trùng được tính bằng phân bố siêu bội. Với chuỗi chữ số, chương trình đếm chính xác toàn bộ không gian chuỗi hợp lệ của từng kỳ. Kết quả không phụ thuộc seed.</span></li>
           <li><strong>So sánh theo từng kỳ</strong><span>Với mỗi kỳ tính d = điểm chiến lược - điểm kỳ vọng đồng đều. Báo cáo lấy trung bình d và tính z = trung bình(d) / (độ lệch chuẩn(d) / √n), rồi lấy p hai phía từ phân bố chuẩn.</span></li>
+          ${blockBootstrapDescription}
           ${multipleTestingDescription}
           ${trialDispositionDescription}
         </ol>
@@ -1758,6 +1760,26 @@ function renderBacktestWindowSensitivity(sensitivity) {
       Cửa sổ mặc định ${numberFormatter.format(primary)} kỳ là trial công bố;
       ${numberFormatter.format(alternatives)} trial cửa sổ phụ được giữ trong registry.
       Tổng ma trận độ nhạy có ${numberFormatter.format(trialCount)} dòng.
+    </span></li>`;
+}
+
+function renderBacktestBlockBootstrap(backtest) {
+  const check = backtest?.comparison?.block_bootstrap_check;
+  if (!check || check.status !== "available") return "";
+  const lower = formatSigned(check.confidence_interval_lower);
+  const upper = formatSigned(check.confidence_interval_upper);
+  const normal = check.normal_approximation || {};
+  const normalLower = formatSigned(normal.confidence_interval_lower);
+  const normalUpper = formatSigned(normal.confidence_interval_upper);
+  const sampleText = check.bootstrap_value_count < check.full_value_count
+    ? `, mẫu đều ${numberFormatter.format(check.bootstrap_value_count)}/${numberFormatter.format(check.full_value_count)}`
+    : "";
+  return `
+    <li><strong>Block bootstrap theo chuỗi</strong><span>
+      Chẩn đoán bổ sung resample block liên tiếp ${numberFormatter.format(check.block_length)} kỳ${escapeHtml(sampleText)}.
+      Với chiến lược chính, khoảng bootstrap 95% là [${escapeHtml(lower)}, ${escapeHtml(upper)}],
+      so với khoảng chuẩn [${escapeHtml(normalLower)}, ${escapeHtml(normalUpper)}].
+      Trường này không đổi p, q hoặc kết luận thắng baseline.
     </span></li>`;
 }
 

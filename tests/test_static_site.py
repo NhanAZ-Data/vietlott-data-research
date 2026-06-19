@@ -20,7 +20,7 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert 'id="phan-tich"' in index
     assert 'id="du-doan"' in index
     assert 'id="kiem-dinh"' in index
-    assert "assets/app.js?v=20260618-11" in index
+    assert "assets/app.js?v=20260618-12" in index
     assert "archive-summary-heading" in index
     assert "Sổ dự đoán toàn hệ thống" in index
     assert "assets/docs.js?v=20260618-2" in data_page
@@ -139,6 +139,8 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "renderBacktestPhaseSplit" in app_script
     assert "renderBacktestWindowSensitivity" in app_script
     assert "window_sensitivity" in app_script
+    assert "renderBacktestBlockBootstrap" in app_script
+    assert "block_bootstrap_check" in app_script
     assert "Tách chọn công thức và đánh giá cuối" in app_script
     assert "renderBacktestMultipleTestingScope" in app_script
     assert "Registry hiệu chỉnh nhiều phép thử" in app_script
@@ -146,6 +148,7 @@ def test_static_site_has_required_pages_and_local_assets() -> None:
     assert "Nhật ký trial thất bại và bị loại" in app_script
     assert "trial_disposition_log" in method_page
     assert "window_sensitivity" in method_page
+    assert "block_bootstrap_check" in method_page
     assert "Baseline trùng một phần" in app_script
     assert "Thước đo riêng" in app_script
     assert "Ba chiến lược ứng viên" in method_page
@@ -230,6 +233,16 @@ def test_generated_site_data_matches_manifest() -> None:
     assert window_validation["included_trial_count"] == len(manifest["products"]) * 9
     assert window_validation["alternative_window_trial_count"] == (
         len(manifest["products"]) * 6
+    )
+    bootstrap_validation = manifest["backtest_summary"]["block_bootstrap_validation"]
+    assert bootstrap_validation["status"] == "validated"
+    assert bootstrap_validation["method"] == "moving_block_bootstrap"
+    assert bootstrap_validation["product_count"] == len(manifest["products"])
+    assert bootstrap_validation["comparison_check_count"] == len(manifest["products"]) * 3
+    assert bootstrap_validation["trial_check_count"] == len(manifest["products"]) * 13
+    assert bootstrap_validation["available_check_count"] == (
+        bootstrap_validation["comparison_check_count"]
+        + bootstrap_validation["trial_check_count"]
     )
     disposition_validation = manifest["backtest_summary"]["trial_disposition_validation"]
     assert disposition_validation["status"] == "validated"
@@ -467,6 +480,14 @@ def test_generated_site_data_matches_manifest() -> None:
         assert {
             row["trial_id"] for row in window_sensitivity["trials"]
         }.issubset({row["trial_id"] for row in trial_registry["trials"]})
+        bootstrap = report["backtest"]["comparison"]["block_bootstrap_check"]
+        assert bootstrap["status"] == "available"
+        assert bootstrap["method"] == "moving_block_bootstrap"
+        assert bootstrap["normal_approximation"]["method"] == "paired_normal_mean_interval"
+        assert all(
+            row["block_bootstrap_check"]["status"] == "available"
+            for row in trial_registry["trials"]
+        )
         trial_log = report["backtest"]["trial_disposition_log"]
         assert trial_log["included_trial_count"] == trial_registry["trial_count"]
         assert trial_log["rejected_configuration_count"] >= 4

@@ -463,7 +463,19 @@ file để giữ lại dấu vết thay đổi.
 
 ### P1.6 Ước lượng bất định đúng với chuỗi thời gian
 
-- [ ] `BACKTEST-010` So sánh xấp xỉ chuẩn hiện tại với block bootstrap.
+- [x] `BACKTEST-010` So sánh xấp xỉ chuẩn hiện tại với block bootstrap.
+  - Hoàn thành ngày 18/06/2026.
+  - Mỗi comparison công bố và mỗi trial trong `multiple_testing_trials` có
+    `block_bootstrap_check`, dùng 199 lần moving-block bootstrap trên chuỗi chênh
+    lệch theo kỳ.
+  - Mỗi check công bố `normal_approximation` và
+    `interval_overlap_with_normal_approximation` để so khoảng chuẩn với khoảng
+    bootstrap; không đổi p-value, q-value hoặc kết luận thắng baseline.
+  - `finalize_backtests` công bố
+    `manifest.backtest_summary.block_bootstrap_validation`.
+  - Website hiển thị "Block bootstrap theo chuỗi"; tài liệu hóa trong
+    `docs/BACKTEST_BLOCK_BOOTSTRAP.md` và khóa bằng unit test, documentation
+    test, static-site test.
 - [ ] `BACKTEST-011` Thêm khoảng tin cậy cho chênh lệch giữa hai chiến lược trên cùng kỳ.
 - [ ] `BACKTEST-012` Thêm kiểm định paired permutation hoặc phương pháp tương đương.
 - [ ] `BACKTEST-013` Báo cáo hiệu ứng tuyệt đối, hiệu ứng tương đối và ý nghĩa thực dụng.

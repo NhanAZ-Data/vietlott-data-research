@@ -65,6 +65,9 @@ backtest hoặc cách đọc website. Thay đổi giao diện thuần túy khôn
 - Thêm `backtest.window_sensitivity`, chạy lại ba chiến lược công bố trên cửa
   sổ gần 50/200/500 kỳ; các cửa sổ phụ được đưa vào `multiple_testing_trials`
   và manifest công bố `window_sensitivity_validation`
+- Thêm `block_bootstrap_check` cho comparison và trial registry của backtest,
+  so khoảng bootstrap theo block kỳ liên tiếp với khoảng chuẩn hiện tại; manifest
+  công bố `block_bootstrap_validation`
 
 ## 15/06/2026
 

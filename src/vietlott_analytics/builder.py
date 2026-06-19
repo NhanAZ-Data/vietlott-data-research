@@ -224,6 +224,9 @@ def _build_analysis_export(
                 "window_sensitivity_field": (
                     "product_reports[*].backtest.window_sensitivity"
                 ),
+                "block_bootstrap_check_field": (
+                    "product_reports[*].backtest.*.block_bootstrap_check"
+                ),
                 "trial_disposition_log_field": (
                     "product_reports[*].backtest.trial_disposition_log"
                 ),
@@ -252,6 +255,10 @@ def _build_analysis_export(
                     "backtest_summary",
                     {},
                 ).get("window_sensitivity_validation", {}),
+                "block_bootstrap_validation": manifest.get(
+                    "backtest_summary",
+                    {},
+                ).get("block_bootstrap_validation", {}),
                 "trial_disposition_validation": manifest.get(
                     "backtest_summary",
                     {},

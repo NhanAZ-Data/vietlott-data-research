@@ -333,6 +333,12 @@
             số và cùng đi vào hiệu chỉnh Benjamini-Hochberg.
           </p>
           <p>
+            Mỗi comparison và trial trong registry có thêm
+            <code>block_bootstrap_check</code>. Trường này resample các block kỳ
+            liên tiếp để so sánh khoảng 95% của block bootstrap với khoảng chuẩn
+            hiện tại, nhưng không đổi p-value, q-value hoặc trạng thái thắng baseline.
+          </p>
+          <p>
             Báo cáo cũng lưu <code>trial_disposition_log</code>: mọi trial đã chạy
             nhưng không thắng sau hiệu chỉnh, cùng các cấu hình bị loại trước phase
             đánh giá cuối và lý do loại. Nhật ký này giữ lại kết quả âm để tránh
