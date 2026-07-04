@@ -1,6 +1,6 @@
 {
   "dataset_rows": {
-    "draws": 382630,
+    "draws": 382646,
     "prizes": 45866
   },
   "date_range": {
@@ -104,9 +104,9 @@
       "sha256": "3db7f6364c4deefdbbc43078036d2f178147fc025345f41f94b16d967a532751"
     },
     "draws/bingo18/2026-07.csv": {
-      "bytes": 137847,
-      "data_rows": 352,
-      "sha256": "c1edd3f1961bf570fe3e090b878e2b794b04240340d2c4d3efbbbb86065a70a3"
+      "bytes": 141365,
+      "data_rows": 361,
+      "sha256": "3e2dd316cb425c877d1caeb09aff08c54f50b0b3fd70eaa5fdc703ec3946d16b"
     },
     "draws/keno/2019-08.csv": {
       "bytes": 359449,
@@ -524,9 +524,9 @@
       "sha256": "963bde6f02f9b9c779f3e6c2303c006ef7a43d15b80353ac7f05fb4c3eac8ef4"
     },
     "draws/keno/2026-07.csv": {
-      "bytes": 155508,
-      "data_rows": 327,
-      "sha256": "28201ff214e343bfadefeb943413c434fd343082bb16855ffac81df0f8895cca"
+      "bytes": 158834,
+      "data_rows": 334,
+      "sha256": "7a014180055612e67f9e15803adc8d82adabc3dc1c8bc28d329da4c37b775aae"
     },
     "draws/lotto535/all.csv": {
       "bytes": 291852,
@@ -565,11 +565,11 @@
     },
     "metadata/dataset-summary.json": {
       "bytes": 2145,
-      "sha256": "8fcef74ff690f1da9a8964dc1d5c25cec9a1529a3d542eafad16ec091ef6eaac"
+      "sha256": "f9b3cde4f2f6c1b4da229893f51d7807c5bf2dfa4b483807e48f3838645376ad"
     },
     "metadata/quality-report.json": {
       "bytes": 44098,
-      "sha256": "6dae767e1fce2d3e137a2a8014d006ac66c01891232558a83bf6d0bbbfd06ded"
+      "sha256": "39a47aef75fd5fc7c8d75223afaa877be787881473e28e24f3f5d9b9dfe9d337"
     },
     "prize_rules.csv": {
       "bytes": 89189,
@@ -625,5 +625,5 @@
   "parser_version": "0.2.0",
   "repository_commit": "dcab3b78245ba840b9f63667955e267efdb7c930",
   "schema_version": 1,
-  "snapshot_at": "2026-07-04T15:18:16+00:00"
+  "snapshot_at": "2026-07-04T15:20:09+00:00"
 }
