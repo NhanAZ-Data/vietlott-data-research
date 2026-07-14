@@ -1,9 +1,9 @@
 {
-  "confirmed_rows": 384411,
-  "dataset_updated_at": "2026-07-14T11:10:39+00:00",
-  "draw_rows": 384472,
+  "confirmed_rows": 384413,
+  "dataset_updated_at": "2026-07-14T12:21:11+00:00",
+  "draw_rows": 384474,
   "not_confirmed_rows": 61,
-  "prize_rows": 46098,
+  "prize_rows": 46111,
   "products": {
     "bingo18": {
       "confirmed_rows": 91163,
@@ -42,13 +42,13 @@
       "rows": 1105
     },
     "max3dpro": {
-      "confirmed_rows": 751,
+      "confirmed_rows": 752,
       "first_date": "2021-09-14",
-      "last_date": "2026-07-11",
-      "max_id": "00751",
+      "last_date": "2026-07-14",
+      "max_id": "00752",
       "min_id": "00001",
       "not_confirmed_rows": 0,
-      "rows": 751
+      "rows": 752
     },
     "max4d": {
       "confirmed_rows": 722,
@@ -69,13 +69,13 @@
       "rows": 1535
     },
     "power655": {
-      "confirmed_rows": 1370,
+      "confirmed_rows": 1371,
       "first_date": "2017-08-01",
-      "last_date": "2026-07-11",
-      "max_id": "01370",
+      "last_date": "2026-07-14",
+      "max_id": "01371",
       "min_id": "00001",
       "not_confirmed_rows": 0,
-      "rows": 1370
+      "rows": 1371
     }
   },
   "schema_version": 1,
