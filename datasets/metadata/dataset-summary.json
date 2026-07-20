@@ -1,9 +1,9 @@
 {
-  "confirmed_rows": 385735,
-  "dataset_updated_at": "2026-07-20T12:29:34+00:00",
-  "draw_rows": 385796,
+  "confirmed_rows": 385736,
+  "dataset_updated_at": "2026-07-20T13:13:47+00:00",
+  "draw_rows": 385797,
   "not_confirmed_rows": 61,
-  "prize_rows": 46255,
+  "prize_rows": 46266,
   "products": {
     "bingo18": {
       "confirmed_rows": 91854,
@@ -33,13 +33,13 @@
       "rows": 773
     },
     "max3d": {
-      "confirmed_rows": 1107,
+      "confirmed_rows": 1108,
       "first_date": "2019-04-22",
-      "last_date": "2026-07-17",
-      "max_id": "01107",
+      "last_date": "2026-07-20",
+      "max_id": "01108",
       "min_id": "00001",
       "not_confirmed_rows": 0,
-      "rows": 1107
+      "rows": 1108
     },
     "max3dpro": {
       "confirmed_rows": 754,
