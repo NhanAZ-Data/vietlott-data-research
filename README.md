@@ -1,5 +1,10 @@
 # Vietlott Data Collector
 
+> **Dự án này đã được hợp nhất và lưu trữ.** Mã nguồn collector, snapshot dữ liệu,
+> phân tích, website và các workflow hiện được duy trì tại
+> [NhanAZ-Data/vietlott-research](https://github.com/NhanAZ-Data/vietlott-research).
+> Vui lòng dùng repo mới cho mọi clone, issue và đóng góp tiếp theo.
+
 Repo này là nguồn dữ liệu canonical cho các kết quả Vietlott công khai. Phạm vi
 hiện tại chỉ giữ phần thu thập, chuẩn hóa, kiểm tra và xuất bản snapshot dữ liệu
 tự động.
